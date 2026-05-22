@@ -32,6 +32,7 @@ final class WC_IremboPay {
     private function includes(): void {
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-logger.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-api.php';
+        require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-github-updater.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-webhook.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-wc-gateway-irembopay.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-db.php';
@@ -55,6 +56,39 @@ final class WC_IremboPay {
             new IremboPay_Subscription_Product();
             new IremboPay_Subscriptions_Admin();
         }, 15 );
+        add_action( 'admin_init', [ $this, 'boot_updater' ] );
+        add_action( 'admin_init', [ $this, 'handle_check_update_request' ] );
+        add_filter( 'plugin_action_links_' . plugin_basename( WC_IREMBOPAY_PLUGIN_FILE ), [ $this, 'add_check_update_link' ] );
+    }
+
+    public function boot_updater(): void {
+        if ( ! is_admin() ) { return; }
+        $token = defined( 'WC_IREMBOPAY_GITHUB_TOKEN' ) ? WC_IREMBOPAY_GITHUB_TOKEN : '';
+        new IremboPay_GitHub_Updater(
+            WC_IREMBOPAY_PLUGIN_FILE,
+            'frisoftltd',
+            'woocommerce-irembopay',
+            $token
+        );
+    }
+
+    public function add_check_update_link( array $links ): array {
+        $url = wp_nonce_url(
+            add_query_arg( 'irembopay_check_update', '1', admin_url( 'plugins.php' ) ),
+            'irembopay_check_update'
+        );
+        array_unshift( $links, '<a href="' . esc_url( $url ) . '">' . __( 'Check for Updates', 'wc-irembopay' ) . '</a>' );
+        return $links;
+    }
+
+    public function handle_check_update_request(): void {
+        if ( ! isset( $_GET['irembopay_check_update'] ) || $_GET['irembopay_check_update'] !== '1' ) { return; }
+        check_admin_referer( 'irembopay_check_update' );
+        if ( ! current_user_can( 'update_plugins' ) ) { wp_die( 'Insufficient permissions.' ); }
+        delete_site_transient( 'update_plugins' );
+        delete_site_transient( 'irembopay_github_latest_release' );
+        wp_safe_redirect( admin_url( 'plugins.php' ) );
+        exit;
     }
 
     public function load_textdomain(): void {
