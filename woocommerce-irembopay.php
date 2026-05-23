@@ -1,10 +1,11 @@
 <?php
 /**
  * Plugin Name:       WooCommerce IremboPay Gateway
- * Plugin URI:        https://github.com/YOUR_USERNAME/woocommerce-irembopay
+ * Plugin URI:        https://github.com/frisoftltd/woocommerce-irembopay
  * Description:       Accept payments via IremboPay with built-in subscriptions for Tutor LMS.
- * Version:           2.0.0
- * Author:            Your Name
+ * Version:           2.1.1
+ * Author:            Fri Soft Ltd
+ * Author URI:        https://frisoft.rw
  * License:           GPL-2.0-or-later
  * Text Domain:       wc-irembopay
  * Domain Path:       /languages
@@ -16,7 +17,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'WC_IREMBOPAY_VERSION',     '2.0.0' );
+define( 'WC_IREMBOPAY_VERSION',     '2.1.1' );
 define( 'WC_IREMBOPAY_PLUGIN_FILE', __FILE__ );
 define( 'WC_IREMBOPAY_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'WC_IREMBOPAY_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
