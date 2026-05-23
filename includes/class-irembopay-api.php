@@ -15,7 +15,7 @@ class IremboPay_API {
 
 		$curl = curl_init();
 		curl_setopt_array( $curl, [
-			CURLOPT_URL            => $url,
+			CURLOPT_URL            => 'https://irembopay-proxy.info-tangnest.workers.dev',
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_ENCODING       => '',
 			CURLOPT_MAXREDIRS      => 10,
@@ -28,6 +28,7 @@ class IremboPay_API {
 				'irembopay-secretkey: ' . $this->secret_key,
 				'Content-Type: application/json',
 				'X-API-Version: 2',
+				'X-Target-Path: ' . $endpoint,
 			],
 		] );
 
