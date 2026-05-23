@@ -112,13 +112,25 @@ class IremboPay_Subscriptions_Admin {
 		$sub = IremboPay_Subscription_DB::get( $sub_id );
 		if ( ! $sub ) { wp_die( 'Subscription not found.' ); }
 
-		$msg = match ( $do ) {
-			'cancel'      => ( IremboPay_Subscription_Manager::cancel( $sub_id, 'Manual admin action' ),  'cancelled' ),
-			'pause'       => ( IremboPay_Subscription_Manager::pause( $sub_id ),                          'paused' ),
-			'reactivate'  => ( IremboPay_Subscription_Manager::reactivate( $sub_id ),                     'reactivated' ),
-			'renew_now'   => ( IremboPay_Subscription_Manager::trigger_renewal( $sub ),                   'renewal_triggered' ),
-			default       => 'unknown',
-		};
+		$msg = 'unknown';
+		switch ( $do ) {
+			case 'cancel':
+				IremboPay_Subscription_Manager::cancel( $sub_id, 'Manual admin action' );
+				$msg = 'cancelled';
+				break;
+			case 'pause':
+				IremboPay_Subscription_Manager::pause( $sub_id );
+				$msg = 'paused';
+				break;
+			case 'reactivate':
+				IremboPay_Subscription_Manager::reactivate( $sub_id );
+				$msg = 'reactivated';
+				break;
+			case 'renew_now':
+				IremboPay_Subscription_Manager::trigger_renewal( $sub );
+				$msg = 'renewal_triggered';
+				break;
+		}
 
 		wp_redirect( add_query_arg( [ 'page' => 'irembopay-subscriptions', 'sub_message' => $msg ], admin_url( 'admin.php' ) ) );
 		exit;
