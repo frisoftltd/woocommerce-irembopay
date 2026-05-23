@@ -68,6 +68,16 @@ class IremboPay_Subscription_Product {
 					'placeholder' => 'PC-xxxxxxxx',
 				] ); ?>
 			</div>
+			<div class="options_group">
+				<?php woocommerce_wp_text_input( [
+					'id'          => '_irembopay_product_code',
+					'label'       => __( 'IremboPay Product Code', 'wc-irembopay' ),
+					'description' => __( 'The IremboPay product code for this product (e.g. PC-02f0b15ac4). Overrides the default product code set in gateway settings.', 'wc-irembopay' ),
+					'desc_tip'    => true,
+					'value'       => get_post_meta( $id, '_irembopay_product_code', true ),
+					'placeholder' => 'PC-xxxxxxxx',
+				] ); ?>
+			</div>
 		</div>
 		<script>jQuery(function($){ $('#_irembopay_is_subscription').on('change', function(){ $('.irembopay-sub-fields').toggle(this.checked); }); });</script>
 		<?php
@@ -79,6 +89,7 @@ class IremboPay_Subscription_Product {
 		update_post_meta( $product_id, '_irembopay_sub_interval',      max( 1, absint( $_POST['_irembopay_sub_interval']          ?? 1 ) ) );
 		update_post_meta( $product_id, '_irembopay_sub_grace',         max( 0, absint( $_POST['_irembopay_sub_grace']             ?? 3 ) ) );
 		update_post_meta( $product_id, '_irembopay_sub_product_code',  sanitize_text_field( $_POST['_irembopay_sub_product_code'] ?? '' ) );
+		update_post_meta( $product_id, '_irembopay_product_code', sanitize_text_field( $_POST['_irembopay_product_code'] ?? '' ) );
 	}
 
 	public function subscription_price_html( string $price, WC_Product $product ): string {

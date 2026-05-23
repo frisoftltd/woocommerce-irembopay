@@ -5,6 +5,7 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 
 	public function __construct() {
 		$this->id                 = 'irembopay';
+		$this->icon               = WC_IREMBOPAY_PLUGIN_URL . 'assets/images/irembopay-logo.png';
 		$this->has_fields         = false;
 		$this->method_title       = __( 'IremboPay', 'wc-irembopay' );
 		$this->method_description = __( 'Accept payments via the IremboPay inline checkout modal.', 'wc-irembopay' );
@@ -23,6 +24,7 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
+		add_filter( 'woocommerce_gateway_icon', [ $this, 'gateway_icon_html' ], 10, 2 );
 	}
 
 	public function init_form_fields(): void {
@@ -55,6 +57,13 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 				'description' => __( '✅ This gateway works for ALL WooCommerce products — physical products, digital downloads, courses, and services. Recurring billing is also available natively: enable it on any product under the <strong>IremboPay Subscription</strong> tab.', 'wc-irembopay' ),
 			],
 		];
+	}
+
+	public function gateway_icon_html( string $icon_html, string $gateway_id ): string {
+		if ( $gateway_id !== $this->id ) {
+			return $icon_html;
+		}
+		return '<img src="' . esc_url( WC_IREMBOPAY_PLUGIN_URL . 'assets/images/irembopay-logo.png' ) . '" alt="IremboPay" style="max-height:30px;width:auto;vertical-align:middle;margin-left:8px;" />';
 	}
 
 	public function enqueue_scripts(): void {
@@ -127,7 +136,11 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 				'unitAmount' => (int) round( $item->get_total() / max( 1, $item->get_quantity() ) ),
 				'quantity'   => $item->get_quantity(),
 			];
-			if ( ! empty( $this->product_code ) ) { $line_item['code'] = $this->product_code; }
+			$per_product_code = get_post_meta( $item->get_product_id(), '_irembopay_product_code', true );
+			$code = ! empty( $per_product_code ) ? $per_product_code : $this->product_code;
+			if ( ! empty( $code ) ) {
+				$line_item['code'] = $code;
+			}
 			$items[] = $line_item;
 		}
 		return apply_filters( 'irembopay_payment_items', $items, $order );

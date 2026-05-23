@@ -3,7 +3,7 @@
  * Plugin Name:       WooCommerce IremboPay Gateway
  * Plugin URI:        https://github.com/frisoftltd/woocommerce-irembopay
  * Description:       Accept payments via IremboPay with built-in subscriptions for Tutor LMS.
- * Version:           2.2.2
+ * Version:           2.2.3
  * Author:            Fri Soft Ltd
  * Author URI:        https://frisoft.rw
  * License:           GPL-2.0-or-later
@@ -17,7 +17,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'WC_IREMBOPAY_VERSION',     '2.2.2' );
+define( 'WC_IREMBOPAY_VERSION',     '2.2.3' );
 define( 'WC_IREMBOPAY_PLUGIN_FILE', __FILE__ );
 define( 'WC_IREMBOPAY_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'WC_IREMBOPAY_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
@@ -126,7 +126,35 @@ final class WC_IremboPay {
         if ( ! $order || ! hash_equals( $order->get_order_key(), $order_key ) ) { wp_die( 'Invalid order.' ); }
         $settings   = get_option( 'woocommerce_irembopay_settings', [] );
         $public_key = $settings['public_key'] ?? '';
-        load_template( WC_IREMBOPAY_PLUGIN_DIR . 'templates/payment-page.php', true, compact( 'public_key', 'invoice_number', 'order' ) );
+
+        $redirect_url = $order->get_checkout_order_received_url();
+        if ( class_exists( 'IremboPay_Tutor_Integration' ) ) {
+            $tutor = new IremboPay_Tutor_Integration();
+            foreach ( $order->get_items() as $item ) {
+                $product_id = $item->get_product_id();
+                if ( $tutor->is_bundle_product( $product_id ) ) {
+                    $course_ids = $tutor->get_bundle_course_ids( $product_id );
+                    if ( ! empty( $course_ids ) ) {
+                        $course_url = get_permalink( $course_ids[0] );
+                        if ( $course_url ) {
+                            $redirect_url = $course_url;
+                            break;
+                        }
+                    }
+                    break;
+                }
+                $course_id = $tutor->get_course_id_from_product( $product_id );
+                if ( $course_id ) {
+                    $course_url = get_permalink( $course_id );
+                    if ( $course_url ) {
+                        $redirect_url = $course_url;
+                        break;
+                    }
+                }
+            }
+        }
+
+        load_template( WC_IREMBOPAY_PLUGIN_DIR . 'templates/payment-page.php', true, compact( 'public_key', 'invoice_number', 'order', 'redirect_url' ) );
         exit;
     }
 }

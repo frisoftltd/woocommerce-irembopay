@@ -1,0 +1,1 @@
+Place irembopay-logo.png in this directory

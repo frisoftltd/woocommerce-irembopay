@@ -38,7 +38,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 (function(){
 	var publicKey     = <?php echo wp_json_encode( $args['public_key'] ); ?>;
 	var invoiceNumber = <?php echo wp_json_encode( $args['invoice_number'] ); ?>;
-	var successUrl    = <?php echo wp_json_encode( $args['order']->get_checkout_order_received_url() ); ?>;
+	var successUrl    = <?php echo wp_json_encode( $args['redirect_url'] ?? $args['order']->get_checkout_order_received_url() ); ?>;
 	var spinner = document.getElementById('irembopay-spinner');
 	var btnOpen = document.getElementById('irembopay-reopen');
 	var errBox  = document.getElementById('irembopay-error');
