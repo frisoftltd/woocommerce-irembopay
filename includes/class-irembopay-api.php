@@ -13,10 +13,9 @@ class IremboPay_API {
 	private function post( string $endpoint, array $body ): array {
 		$response = wp_remote_post( self::API_BASE . $endpoint, [
 			'headers' => [
-				'irembopay-secretKey'       => $this->secret_key,
-				'Content-Type'              => 'application/json',
-				'Content-Transfer-Encoding' => 'application/json',
-				'X-API-Version'             => self::API_VERSION,
+				'irembopay-secretkey' => $this->secret_key,
+				'Content-Type'        => 'application/json',
+				'X-API-Version'       => '2',
 			],
 			'body'    => wp_json_encode( $body ),
 			'timeout' => 30,

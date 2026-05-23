@@ -78,8 +78,13 @@ class IremboPay_Subscription_Manager {
 		$product_code  = get_post_meta( $sub->product_id, '_irembopay_sub_product_code', true ) ?: ( $settings['product_code'] ?? '' );
 		$payment_items = [ array_filter( [ 'unitAmount' => (int) round( $sub->amount ), 'quantity' => 1, 'code' => $product_code ?: null ] ) ];
 
+		$expiry_hours = (int) ( $settings['invoice_expiry_hours'] ?? 24 );
+		$expiry_at    = ( new DateTime( 'now', new DateTimeZone( wp_timezone_string() ) ) )
+		                    ->modify( "+{$expiry_hours} hours" )
+		                    ->format( DateTime::ATOM );
+
 		$invoice_data = [
-			'transactionId'            => 'WC-REN-' . $renewal_order->get_id() . '-' . time(),
+			'transactionId'            => sprintf( 'WC-REN-%d-%s', $renewal_order->get_id(), wp_generate_password( 8, false ) ),
 			'paymentAccountIdentifier' => $payment_identifier,
 			'customer'                 => [
 				'email'       => $user->user_email,
@@ -89,6 +94,7 @@ class IremboPay_Subscription_Manager {
 			'paymentItems' => $payment_items,
 			'description'  => self::build_renewal_description( $sub ),
 			'language'     => 'EN',
+			'expiryAt'     => $expiry_at,
 		];
 
 		$api      = new IremboPay_API( $secret_key );
@@ -102,6 +108,7 @@ class IremboPay_Subscription_Manager {
 		}
 
 		$invoice_number = $response['data']['invoiceNumber'];
+		// Intentional: invoice number is stored here, after API success, so the webhook lookup by '_irembopay_invoice_number' finds the order when IremboPay fires the callback.
 		$renewal_order->update_meta_data( '_irembopay_invoice_number', $invoice_number );
 		$renewal_order->update_meta_data( '_irembopay_subscription_id', $sub->id );
 		$renewal_order->update_status( 'pending', sprintf( __( 'IremboPay renewal invoice created: %s', 'wc-irembopay' ), $invoice_number ) );

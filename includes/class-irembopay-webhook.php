@@ -19,6 +19,18 @@ class IremboPay_Webhook {
 
 		IremboPay_Logger::debug( 'Webhook received', [ 'body' => $body ] );
 
+		$settings       = get_option( 'woocommerce_irembopay_settings', [] );
+		$webhook_secret = $settings['webhook_secret'] ?? '';
+		if ( ! empty( $webhook_secret ) ) {
+			$signature = $request->get_header( 'x-irembopay-signature' ) ?? '';
+			$payload   = $request->get_body();
+			$expected  = hash_hmac( 'sha256', $payload, $webhook_secret );
+			if ( ! hash_equals( $expected, $signature ) ) {
+				IremboPay_Logger::error( 'Webhook signature verification failed.' );
+				return new WP_REST_Response( [ 'error' => 'Invalid signature' ], 401 );
+			}
+		}
+
 		if ( ! $invoice_number || ! $payment_status ) {
 			return new WP_REST_Response( [ 'error' => 'Missing required fields' ], 400 );
 		}

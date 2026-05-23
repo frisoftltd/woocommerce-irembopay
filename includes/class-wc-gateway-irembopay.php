@@ -34,12 +34,14 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			'secret_key'  => [ 'title' => __( 'Secret Key', 'wc-irembopay' ), 'type' => 'password', 'desc_tip' => true, 'description' => __( 'Your IremboPay secret key.', 'wc-irembopay' ) ],
 			'public_key'  => [ 'title' => __( 'Public Key', 'wc-irembopay' ), 'type' => 'text', 'desc_tip' => true, 'description' => __( 'Your IremboPay public key (used in the JS modal).', 'wc-irembopay' ) ],
 			'payment_identifier' => [ 'title' => __( 'Payment Account Identifier', 'wc-irembopay' ), 'type' => 'text', 'default' => 'bankrwf', 'desc_tip' => true, 'description' => __( 'Your IremboPay payment account identifier.', 'wc-irembopay' ) ],
-			'product_code'       => [ 'title' => __( 'Default Product Code', 'wc-irembopay' ), 'type' => 'text', 'desc_tip' => true, 'description' => __( 'IremboPay product code applied to all line items (overridable per product).', 'wc-irembopay' ) ],
+			'product_code'         => [ 'title' => __( 'Default Product Code', 'wc-irembopay' ), 'type' => 'text', 'desc_tip' => true, 'description' => __( 'IremboPay product code applied to all line items (overridable per product).', 'wc-irembopay' ) ],
+			'invoice_expiry_hours' => [ 'title' => __( 'Invoice Expiry (hours)', 'wc-irembopay' ), 'type' => 'number', 'default' => '24', 'desc_tip' => true, 'description' => __( 'How many hours before an unpaid invoice expires.', 'wc-irembopay' ) ],
 			'webhook_url' => [
 				'title'       => __( 'Webhook URL', 'wc-irembopay' ),
 				'type'        => 'title',
 				'description' => sprintf( __( 'Add this URL in your IremboPay dashboard: <code>%s</code>', 'wc-irembopay' ), esc_url( rest_url( 'irembopay/v1/webhook' ) ) ),
 			],
+			'webhook_secret' => [ 'title' => __( 'Webhook Secret Key', 'wc-irembopay' ), 'type' => 'password', 'desc_tip' => true, 'description' => __( 'Optional. If set in IremboPay dashboard, enter the same value here to verify webhook authenticity.', 'wc-irembopay' ) ],
 			'tutor_section' => [
 				'title'       => __( 'Tutor LMS', 'wc-irembopay' ),
 				'type'        => 'title',
@@ -50,7 +52,7 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			'subscription_note' => [
 				'title'       => __( 'Built-in Subscriptions', 'wc-irembopay' ),
 				'type'        => 'title',
-				'description' => __( '✅ Recurring payments are handled natively — no WooCommerce Subscriptions plugin needed. Enable subscriptions on any product under the <strong>IremboPay Subscription</strong> tab.', 'wc-irembopay' ),
+				'description' => __( '✅ This gateway works for ALL WooCommerce products — physical products, digital downloads, courses, and services. Recurring billing is also available natively: enable it on any product under the <strong>IremboPay Subscription</strong> tab.', 'wc-irembopay' ),
 			],
 		];
 	}
@@ -67,8 +69,12 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			return [ 'result' => 'failure' ];
 		}
 
-		$transaction_id = 'WC-' . $order->get_id() . '-' . time();
+		$transaction_id = sprintf( 'WC-%d-%s', $order->get_id(), wp_generate_password( 8, false ) );
 		$payment_items  = $this->build_payment_items( $order );
+		$expiry_hours   = (int) $this->get_option( 'invoice_expiry_hours', 24 );
+		$expiry_at      = ( new DateTime( 'now', new DateTimeZone( wp_timezone_string() ) ) )
+		                      ->modify( "+{$expiry_hours} hours" )
+		                      ->format( DateTime::ATOM );
 
 		$invoice_data = [
 			'transactionId'            => $transaction_id,
@@ -83,7 +89,8 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 				sprintf( __( 'Payment for WooCommerce order #%d', 'wc-irembopay' ), $order->get_id() ),
 				$order
 			),
-			'language' => 'EN',
+			'language'  => 'EN',
+			'expiryAt'  => $expiry_at,
 		];
 
 		$api      = new IremboPay_API( $this->secret_key );
