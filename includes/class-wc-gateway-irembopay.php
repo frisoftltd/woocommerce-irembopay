@@ -82,12 +82,30 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			return '';
 		}
 
-		return '<img src="' . $logo_url . '" alt="IremboPay" style="max-height:28px;width:auto;vertical-align:middle;margin-left:8px;border-radius:4px;" />';
+		return '<img src="' . $logo_url . '" alt="IremboPay" style="max-height:80px;width:auto;vertical-align:middle;margin-left:12px;border-radius:6px;display:block;margin-top:6px;" />';
 	}
 
 	public function enqueue_scripts(): void {
 		if ( ! is_checkout() ) { return; }
 		wp_enqueue_script( 'irembopay-inline', 'https://dashboard.irembopay.com/assets/payment/inline.js', [], null, true );
+		wp_add_inline_style( 'woocommerce-general', '
+			.wc_payment_method label img {
+				max-height: 80px !important;
+				width: auto !important;
+				display: inline-block !important;
+				vertical-align: middle !important;
+			}
+			.wc_payment_method.payment_method_irembopay label {
+				display: flex !important;
+				align-items: center !important;
+				gap: 12px !important;
+			}
+			.wc_payment_method.payment_method_irembopay label img {
+				max-height: 80px !important;
+				width: auto !important;
+				border-radius: 8px !important;
+			}
+		' );
 	}
 
 	public function process_payment( $order_id ): array {
