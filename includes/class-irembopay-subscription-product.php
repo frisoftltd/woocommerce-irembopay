@@ -24,11 +24,10 @@ class IremboPay_Subscription_Product {
 	public function render_panel(): void {
 		global $post;
 		$id       = $post->ID;
-		$is_sub   = get_post_meta( $id, '_irembopay_is_subscription',    true );
-		$period   = get_post_meta( $id, '_irembopay_sub_period',         true ) ?: 'month';
-		$interval = get_post_meta( $id, '_irembopay_sub_interval',       true ) ?: '1';
-		$grace    = get_post_meta( $id, '_irembopay_sub_grace',          true ) ?: '3';
-		$code     = get_post_meta( $id, '_irembopay_sub_product_code',   true ) ?: '';
+		$is_sub   = get_post_meta( $id, '_irembopay_is_subscription', true );
+		$period   = get_post_meta( $id, '_irembopay_sub_period',      true ) ?: 'month';
+		$interval = get_post_meta( $id, '_irembopay_sub_interval',    true ) ?: '1';
+		$grace    = get_post_meta( $id, '_irembopay_sub_grace',       true ) ?: '3';
 		?>
 		<div id="irembopay_subscription_data" class="panel woocommerce_options_panel">
 			<div class="options_group">
@@ -58,21 +57,13 @@ class IremboPay_Subscription_Product {
 					'type'              => 'number',
 					'custom_attributes' => [ 'min' => '0', 'max' => '30' ],
 					'value'             => $grace,
-				] );
-				woocommerce_wp_text_input( [
-					'id'          => '_irembopay_sub_product_code',
-					'label'       => __( 'IremboPay Product Code', 'wc-irembopay' ),
-					'description' => __( 'Override the default IremboPay product code for this subscription product.', 'wc-irembopay' ),
-					'desc_tip'    => true,
-					'value'       => $code,
-					'placeholder' => 'PC-xxxxxxxx',
 				] ); ?>
 			</div>
 			<div class="options_group">
 				<?php woocommerce_wp_text_input( [
 					'id'          => '_irembopay_product_code',
 					'label'       => __( 'IremboPay Product Code', 'wc-irembopay' ),
-					'description' => __( 'The IremboPay product code for this product (e.g. PC-02f0b15ac4). Overrides the default product code set in gateway settings.', 'wc-irembopay' ),
+					'description' => __( 'The IremboPay product code for this product (e.g. PC-02f0b15ac4). Overrides the default product code in gateway settings. Required if selling this product via IremboPay.', 'wc-irembopay' ),
 					'desc_tip'    => true,
 					'value'       => get_post_meta( $id, '_irembopay_product_code', true ),
 					'placeholder' => 'PC-xxxxxxxx',
@@ -88,7 +79,6 @@ class IremboPay_Subscription_Product {
 		update_post_meta( $product_id, '_irembopay_sub_period',        sanitize_text_field( $_POST['_irembopay_sub_period']       ?? 'month' ) );
 		update_post_meta( $product_id, '_irembopay_sub_interval',      max( 1, absint( $_POST['_irembopay_sub_interval']          ?? 1 ) ) );
 		update_post_meta( $product_id, '_irembopay_sub_grace',         max( 0, absint( $_POST['_irembopay_sub_grace']             ?? 3 ) ) );
-		update_post_meta( $product_id, '_irembopay_sub_product_code',  sanitize_text_field( $_POST['_irembopay_sub_product_code'] ?? '' ) );
 		update_post_meta( $product_id, '_irembopay_product_code', sanitize_text_field( $_POST['_irembopay_product_code'] ?? '' ) );
 	}
 

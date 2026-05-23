@@ -5,7 +5,6 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 
 	public function __construct() {
 		$this->id                 = 'irembopay';
-		$this->icon               = WC_IREMBOPAY_PLUGIN_URL . 'assets/images/irembopay-logo.png';
 		$this->has_fields         = false;
 		$this->method_title       = __( 'IremboPay', 'wc-irembopay' );
 		$this->method_description = __( 'Accept payments via the IremboPay inline checkout modal.', 'wc-irembopay' );
@@ -21,6 +20,10 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 		$this->payment_identifier = $this->get_option( 'payment_identifier' );
 		$this->product_code       = $this->get_option( 'product_code' );
 		$this->testmode           = 'yes' === $this->get_option( 'testmode' );
+		$saved_logo               = $this->get_option( 'gateway_logo' );
+		$this->icon               = ! empty( $saved_logo )
+			? esc_url( $saved_logo )
+			: WC_IREMBOPAY_PLUGIN_URL . 'assets/images/irembopay-logo.png';
 
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
@@ -32,6 +35,14 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			'enabled'     => [ 'title' => __( 'Enable / Disable', 'wc-irembopay' ), 'type' => 'checkbox', 'label' => __( 'Enable IremboPay Gateway', 'wc-irembopay' ), 'default' => 'yes' ],
 			'testmode'    => [ 'title' => __( 'Test Mode', 'wc-irembopay' ), 'type' => 'checkbox', 'label' => __( 'Enable sandbox mode', 'wc-irembopay' ), 'default' => 'no', 'desc_tip' => true, 'description' => __( 'Use sandbox credentials while testing.', 'wc-irembopay' ) ],
 			'title'       => [ 'title' => __( 'Title', 'wc-irembopay' ), 'type' => 'text', 'default' => 'IremboPay', 'desc_tip' => true, 'description' => __( 'Payment method title shown at checkout.', 'wc-irembopay' ) ],
+			'gateway_logo' => [
+				'title'       => __( 'Payment Method Logo URL', 'wc-irembopay' ),
+				'type'        => 'text',
+				'description' => __( 'Paste the full URL of your logo image. Upload your logo via Media Library and paste the URL here. Leave blank to use no logo. Example: https://lms.tangnest.rw/wp-content/uploads/2026/05/irembopay-logo.png', 'wc-irembopay' ),
+				'desc_tip'    => true,
+				'default'     => '',
+				'placeholder' => 'https://yourdomain.com/wp-content/uploads/your-logo.png',
+			],
 			'description' => [ 'title' => __( 'Description', 'wc-irembopay' ), 'type' => 'textarea', 'default' => __( 'Pay securely using IremboPay.', 'wc-irembopay' ) ],
 			'secret_key'  => [ 'title' => __( 'Secret Key', 'wc-irembopay' ), 'type' => 'password', 'desc_tip' => true, 'description' => __( 'Your IremboPay secret key.', 'wc-irembopay' ) ],
 			'public_key'  => [ 'title' => __( 'Public Key', 'wc-irembopay' ), 'type' => 'text', 'desc_tip' => true, 'description' => __( 'Your IremboPay public key (used in the JS modal).', 'wc-irembopay' ) ],
@@ -63,7 +74,15 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 		if ( $gateway_id !== $this->id ) {
 			return $icon_html;
 		}
-		return '<img src="' . esc_url( WC_IREMBOPAY_PLUGIN_URL . 'assets/images/irembopay-logo.png' ) . '" alt="IremboPay" style="max-height:30px;width:auto;vertical-align:middle;margin-left:8px;" />';
+
+		$settings = get_option( 'woocommerce_irembopay_settings', [] );
+		$logo_url = ! empty( $settings['gateway_logo'] ) ? esc_url( $settings['gateway_logo'] ) : '';
+
+		if ( empty( $logo_url ) ) {
+			return '';
+		}
+
+		return '<img src="' . $logo_url . '" alt="IremboPay" style="max-height:28px;width:auto;vertical-align:middle;margin-left:8px;border-radius:4px;" />';
 	}
 
 	public function enqueue_scripts(): void {
