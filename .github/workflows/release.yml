@@ -18,19 +18,19 @@ jobs:
 
       - name: Build plugin zip
         run: |
-          rsync -r \
-            --exclude='.git/' \
-            --exclude='.github/' \
+          mkdir -p /tmp/build/woocommerce-irembopay
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.github' \
             --exclude='.gitignore' \
             --exclude='*.md' \
-            --exclude='node_modules/' \
+            --exclude='node_modules' \
             --exclude='*.zip' \
-            . /tmp/build/woocommerce-irembopay/
-
+            ./ /tmp/build/woocommerce-irembopay/
           cd /tmp/build
-          zip -r "$GITHUB_WORKSPACE/woocommerce-irembopay.zip" woocommerce-irembopay/
+          zip -r woocommerce-irembopay.zip woocommerce-irembopay
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: woocommerce-irembopay.zip
+          files: /tmp/build/woocommerce-irembopay.zip
