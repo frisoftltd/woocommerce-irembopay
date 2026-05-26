@@ -35,7 +35,13 @@ class IremboPay_Webhook {
 			return new WP_REST_Response( [ 'error' => 'Missing required fields' ], 400 );
 		}
 
-		$orders = wc_get_orders( [ 'limit' => 1, 'meta_query' => [ [ 'key' => '_irembopay_invoice_number', 'value' => $invoice_number ] ] ] );
+		$orders = wc_get_orders( [
+			'limit'      => 1,
+			'meta_query' => [ [
+				'key'   => '_irembopay_invoice_number',
+				'value' => $invoice_number,
+			] ],
+		] );
 		if ( empty( $orders ) ) {
 			IremboPay_Logger::error( 'Order not found for invoice: ' . $invoice_number );
 			return new WP_REST_Response( [ 'error' => 'Order not found' ], 404 );

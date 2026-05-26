@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.2.6
+- Fix: Paid orders now correctly move to Completed when using HPOS (High Performance Order Storage). Webhook handler was querying wp_postmeta instead of wp_wc_orders_meta, causing all webhooks to return "Order not found".
+
 ### v2.0.0
 - Full plugin rewrite — proper multi-file structure
 - Built-in subscription engine (no WooCommerce Subscriptions needed)
