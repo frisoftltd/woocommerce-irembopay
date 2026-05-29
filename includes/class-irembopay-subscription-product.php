@@ -9,6 +9,11 @@ class IremboPay_Subscription_Product {
 		add_action( 'woocommerce_process_product_meta', [ $this, 'save_fields' ] );
 		add_filter( 'woocommerce_get_price_html',       [ $this, 'subscription_price_html' ], 10, 2 );
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
+
+		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_installment_dropdown' ] );
+		add_filter( 'woocommerce_add_cart_item_data',              [ $this, 'add_installment_to_cart_item' ], 10, 3 );
+		add_filter( 'woocommerce_get_item_data',                   [ $this, 'display_installment_in_cart' ], 10, 2 );
+		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'save_installment_to_order' ], 10, 4 );
 	}
 
 	public function add_tab( array $tabs ): array {
@@ -59,6 +64,28 @@ class IremboPay_Subscription_Product {
 					'value'             => $grace,
 				] ); ?>
 			</div>
+			<?php
+			$allow_inst    = get_post_meta( $id, '_irembopay_allow_installments', true );
+			$inst_options  = get_post_meta( $id, '_irembopay_installment_options', true );
+			$inst_options  = is_array( $inst_options ) ? $inst_options : [];
+			?>
+			<div class="options_group irembopay-sub-fields" <?php echo $is_sub !== 'yes' ? 'style="display:none"' : ''; ?>>
+				<?php woocommerce_wp_checkbox( [
+					'id'          => '_irembopay_allow_installments',
+					'label'       => __( 'Allow Installments', 'wc-irembopay' ),
+					'description' => __( 'Let customers split this payment into multiple installments.', 'wc-irembopay' ),
+					'value'       => $allow_inst,
+				] ); ?>
+				<p class="form-field irembopay-inst-options" <?php echo $allow_inst !== 'yes' ? 'style="display:none"' : ''; ?>>
+					<label><?php esc_html_e( 'Installment Options', 'wc-irembopay' ); ?></label>
+					<?php foreach ( [ 1, 2, 3, 4, 6 ] as $n ) : ?>
+						<label style="margin-right:12px;font-weight:normal">
+							<input type="checkbox" name="_irembopay_installment_options[]" value="<?php echo esc_attr( $n ); ?>" <?php checked( in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true ) ); ?>>
+							<?php echo esc_html( $n ); ?>
+						</label>
+					<?php endforeach; ?>
+				</p>
+			</div>
 			<div class="options_group">
 				<?php woocommerce_wp_text_input( [
 					'id'          => '_irembopay_product_code',
@@ -70,7 +97,10 @@ class IremboPay_Subscription_Product {
 				] ); ?>
 			</div>
 		</div>
-		<script>jQuery(function($){ $('#_irembopay_is_subscription').on('change', function(){ $('.irembopay-sub-fields').toggle(this.checked); }); });</script>
+		<script>jQuery(function($){
+		$('#_irembopay_is_subscription').on('change', function(){ $('.irembopay-sub-fields').toggle(this.checked); });
+		$('#_irembopay_allow_installments').on('change', function(){ $('.irembopay-inst-options').toggle(this.checked); });
+	});</script>
 		<?php
 	}
 
@@ -80,6 +110,67 @@ class IremboPay_Subscription_Product {
 		update_post_meta( $product_id, '_irembopay_sub_interval',      max( 1, absint( $_POST['_irembopay_sub_interval']          ?? 1 ) ) );
 		update_post_meta( $product_id, '_irembopay_sub_grace',         max( 0, absint( $_POST['_irembopay_sub_grace']             ?? 3 ) ) );
 		update_post_meta( $product_id, '_irembopay_product_code', sanitize_text_field( $_POST['_irembopay_product_code'] ?? '' ) );
+
+		update_post_meta( $product_id, '_irembopay_allow_installments', isset( $_POST['_irembopay_allow_installments'] ) ? 'yes' : 'no' );
+		$raw_opts = isset( $_POST['_irembopay_installment_options'] ) ? (array) $_POST['_irembopay_installment_options'] : [];
+		$valid    = array_values( array_intersect( array_map( 'intval', $raw_opts ), [ 1, 2, 3, 4, 6 ] ) );
+		update_post_meta( $product_id, '_irembopay_installment_options', $valid );
+	}
+
+	public function render_installment_dropdown(): void {
+		global $product;
+		if ( ! $product || 'yes' !== get_post_meta( $product->get_id(), '_irembopay_allow_installments', true ) ) { return; }
+		$options = get_post_meta( $product->get_id(), '_irembopay_installment_options', true );
+		if ( empty( $options ) || ! is_array( $options ) ) { return; }
+		$options = array_unique( array_map( 'intval', $options ) );
+		sort( $options );
+		if ( ! in_array( 1, $options, true ) ) { array_unshift( $options, 1 ); }
+		$price = (float) $product->get_price();
+		?>
+		<div class="irembopay-installment-selector" style="margin-bottom:1.2em;">
+			<label for="irembopay_installments" style="font-weight:bold;display:block;margin-bottom:.4em;">
+				<?php esc_html_e( 'Pay in:', 'wc-irembopay' ); ?>
+			</label>
+			<select name="irembopay_installments" id="irembopay_installments" style="min-width:260px">
+				<?php foreach ( $options as $n ) :
+					$per   = $n > 0 ? (int) round( $price / $n, 0 ) : (int) $price;
+					$label = $n === 1
+						? sprintf( __( '1 installment — %s today', 'wc-irembopay' ), strip_tags( wc_price( $per ) ) )
+						: sprintf( __( '%d installments — %s per installment', 'wc-irembopay' ), $n, strip_tags( wc_price( $per ) ) );
+				?>
+					<option value="<?php echo esc_attr( $n ); ?>"><?php echo esc_html( $label ); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</div>
+		<?php
+	}
+
+	public function add_installment_to_cart_item( array $cart_item_data, int $product_id, int $variation_id ): array {
+		if ( 'yes' !== get_post_meta( $product_id, '_irembopay_allow_installments', true ) ) { return $cart_item_data; }
+		$n = absint( $_POST['irembopay_installments'] ?? 1 );
+		if ( $n > 1 ) {
+			$cart_item_data['irembopay_installments'] = $n;
+		}
+		return $cart_item_data;
+	}
+
+	public function display_installment_in_cart( array $item_data, array $cart_item ): array {
+		if ( ! empty( $cart_item['irembopay_installments'] ) ) {
+			$n           = (int) $cart_item['irembopay_installments'];
+			$item_data[] = [
+				'key'   => __( 'Payment plan', 'wc-irembopay' ),
+				'value' => sprintf( _n( '%d installment', '%d installments', $n, 'wc-irembopay' ), $n ),
+			];
+		}
+		return $item_data;
+	}
+
+	public function save_installment_to_order( \WC_Order_Item_Product $item, string $cart_item_key, array $cart_item_values, \WC_Order $order ): void {
+		if ( ! empty( $cart_item_values['irembopay_installments'] ) ) {
+			$n = (int) $cart_item_values['irembopay_installments'];
+			$item->add_meta_data( '_irembopay_chosen_installments', $n, true );
+			$order->update_meta_data( '_irembopay_chosen_installments', $n );
+		}
 	}
 
 	public function subscription_price_html( string $price, WC_Product $product ): string {

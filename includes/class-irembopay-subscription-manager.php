@@ -24,7 +24,9 @@ class IremboPay_Subscription_Manager {
 			$period   = get_post_meta( $product_id, '_irembopay_sub_period',   true ) ?: 'month';
 			$interval = (int) get_post_meta( $product_id, '_irembopay_sub_interval', true ) ?: 1;
 			$grace    = (int) get_post_meta( $product_id, '_irembopay_sub_grace',    true ) ?: 3;
-			$amount   = (float) ( $item->get_total() / max( 1, $item->get_quantity() ) );
+			$amount      = (float) ( $item->get_total() / max( 1, $item->get_quantity() ) );
+			$full_amount = (float) $order->get_meta( '_irembopay_installment_full_amount' );
+			if ( $full_amount > 0 ) { $amount = $full_amount; }
 			$now      = current_time( 'mysql' );
 
 			$sub_id = IremboPay_Subscription_DB::insert( [

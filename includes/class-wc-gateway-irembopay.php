@@ -115,8 +115,20 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			return [ 'result' => 'failure' ];
 		}
 
-		$transaction_id = sprintf( 'WC-%d-%s', $order->get_id(), wp_generate_password( 8, false ) );
-		$payment_items  = $this->build_payment_items( $order );
+		$transaction_id      = sprintf( 'WC-%d-%s', $order->get_id(), wp_generate_password( 8, false ) );
+		$chosen_installments = max( 1, (int) $order->get_meta( '_irembopay_chosen_installments' ) );
+		$full_total          = (float) $order->get_total();
+
+		if ( $chosen_installments > 1 ) {
+			$installment_amount = (int) round( $full_total / $chosen_installments, 0 );
+			$order->update_meta_data( '_irembopay_installment_amount', $installment_amount );
+			$order->update_meta_data( '_irembopay_installment_full_amount', $full_total );
+			$order->save();
+			$payment_items = $this->build_installment_payment_items( $order, $installment_amount );
+		} else {
+			$payment_items = $this->build_payment_items( $order );
+		}
+
 		$expiry_hours   = (int) $this->get_option( 'invoice_expiry_hours', 24 );
 		$expiry_at      = ( new DateTime( 'now', new DateTimeZone( wp_timezone_string() ) ) )
 		                      ->modify( "+{$expiry_hours} hours" )
@@ -164,6 +176,19 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 				'key'               => $order->get_order_key(),
 			], home_url( '/' ) ),
 		];
+	}
+
+	private function build_installment_payment_items( WC_Order $order, int $installment_amount ): array {
+		$items      = [];
+		$order_item = array_values( $order->get_items() )[0] ?? null;
+		$item       = [ 'unitAmount' => $installment_amount, 'quantity' => 1 ];
+		if ( $order_item ) {
+			$per_product_code = get_post_meta( $order_item->get_product_id(), '_irembopay_product_code', true );
+			$code = ! empty( $per_product_code ) ? $per_product_code : $this->product_code;
+			if ( ! empty( $code ) ) { $item['code'] = $code; }
+		}
+		$items[] = $item;
+		return apply_filters( 'irembopay_payment_items', $items, $order );
 	}
 
 	private function build_payment_items( WC_Order $order ): array {

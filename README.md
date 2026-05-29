@@ -142,6 +142,16 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.3.0
+- New: Installment payment support — split course payments into 1, 2, 3, 4, or 6 installments
+- New: Per-product installment configuration (enable and choose allowed options)
+- New: Product-page dropdown lets customers choose their payment plan at add-to-cart
+- New: Auto-billing cron creates IremboPay invoices for each installment as they come due
+- New: Grace period reminders, overdue notices, access suspension and restoration emails
+- New: Tutor LMS course access is suspended on missed installment and restored with end-date extension on late payment
+- New: `wp_irembopay_installments` database table to track all installment rows
+- Subscription renewal amount is always stored at full price regardless of installment split
+
 ### v2.2.6
 - Fix: Paid orders now correctly move to Completed when using HPOS (High Performance Order Storage). Webhook handler was querying wp_postmeta instead of wp_wc_orders_meta, causing all webhooks to return "Order not found".
 
