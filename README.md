@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.3.2
+- Fix: Installment checkboxes are now much larger and clearly readable with proper spacing
+
 ### v2.3.1
 - Fix: Added spacing between "Every" label and billing cycle dropdown
 - Fix: Installment checkboxes are now larger and have proper spacing between them

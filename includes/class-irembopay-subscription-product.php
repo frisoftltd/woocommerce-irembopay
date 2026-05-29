@@ -79,9 +79,9 @@ class IremboPay_Subscription_Product {
 				<p class="form-field irembopay-inst-options" <?php echo $allow_inst !== 'yes' ? 'style="display:none"' : ''; ?>>
 					<label><?php esc_html_e( 'Installment Options', 'wc-irembopay' ); ?></label>
 					<?php foreach ( [ 1, 2, 3, 4, 6 ] as $n ) : ?>
-						<label style="margin-right:16px;font-weight:normal;font-size:14px">
-							<input type="checkbox" name="_irembopay_installment_options[]" value="<?php echo esc_attr( $n ); ?>" style="width:16px;height:16px;margin-right:4px;vertical-align:middle" <?php checked( in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true ) ); ?>>
-							<?php echo esc_html( $n ); ?>
+						<label style="display:inline-flex;align-items:center;justify-content:center;margin-right:16px;margin-bottom:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1d2327">
+							<input type="checkbox" name="_irembopay_installment_options[]" value="<?php echo esc_attr( $n ); ?>" style="width:20px;height:20px;margin-right:6px;cursor:pointer;accent-color:#2271b1" <?php checked( in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true ) ); ?>>
+							<?php echo esc_html( $n ); ?>x
 						</label>
 					<?php endforeach; ?>
 				</p>
