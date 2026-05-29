@@ -46,7 +46,7 @@ class IremboPay_Subscription_Product {
 			<div class="options_group irembopay-sub-fields" <?php echo $is_sub !== 'yes' ? 'style="display:none"' : ''; ?>>
 				<p class="form-field">
 					<label><?php esc_html_e( 'Billing Cycle', 'wc-irembopay' ); ?></label>
-					<?php esc_html_e( 'Every', 'wc-irembopay' ); ?>
+					<span style="margin-left:8px"><?php esc_html_e( 'Every', 'wc-irembopay' ); ?></span>
 					<input type="number" name="_irembopay_sub_interval" value="<?php echo esc_attr( $interval ); ?>" min="1" max="365" style="width:60px">
 					<select name="_irembopay_sub_period">
 						<?php foreach ( [ 'day' => __( 'Day(s)', 'wc-irembopay' ), 'week' => __( 'Week(s)', 'wc-irembopay' ), 'month' => __( 'Month(s)', 'wc-irembopay' ), 'year' => __( 'Year(s)', 'wc-irembopay' ) ] as $val => $label ) : ?>
@@ -79,8 +79,8 @@ class IremboPay_Subscription_Product {
 				<p class="form-field irembopay-inst-options" <?php echo $allow_inst !== 'yes' ? 'style="display:none"' : ''; ?>>
 					<label><?php esc_html_e( 'Installment Options', 'wc-irembopay' ); ?></label>
 					<?php foreach ( [ 1, 2, 3, 4, 6 ] as $n ) : ?>
-						<label style="margin-right:12px;font-weight:normal">
-							<input type="checkbox" name="_irembopay_installment_options[]" value="<?php echo esc_attr( $n ); ?>" <?php checked( in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true ) ); ?>>
+						<label style="margin-right:16px;font-weight:normal;font-size:14px">
+							<input type="checkbox" name="_irembopay_installment_options[]" value="<?php echo esc_attr( $n ); ?>" style="width:16px;height:16px;margin-right:4px;vertical-align:middle" <?php checked( in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true ) ); ?>>
 							<?php echo esc_html( $n ); ?>
 						</label>
 					<?php endforeach; ?>

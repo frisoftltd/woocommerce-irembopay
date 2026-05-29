@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.3.1
+- Fix: Added spacing between "Every" label and billing cycle dropdown
+- Fix: Installment checkboxes are now larger and have proper spacing between them
+
 ### v2.3.0
 - New: Installment payment support — split course payments into 1, 2, 3, 4, or 6 installments
 - New: Per-product installment configuration (enable and choose allowed options)
