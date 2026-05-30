@@ -142,6 +142,11 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.5.0
+- Removed: Subscription plan system (plans, plan selector, cart injection)
+- Cleaned: Plugin returns to simple one-time and recurring payment flow
+- Kept: Webhook handler, subscription renewal, cron jobs, admin UI
+
 ### v2.4.7
 - Fix: Plan selector now inside WooCommerce form — plan price correctly passed to checkout
 - Fix: Removed duplicate Subscribe button — WooCommerce button used directly

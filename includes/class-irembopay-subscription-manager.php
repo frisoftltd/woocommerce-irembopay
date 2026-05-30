@@ -22,32 +22,12 @@ class IremboPay_Subscription_Manager {
 			$existing = IremboPay_Subscription_DB::get_active_by_user_product( (int) $order->get_customer_id(), $product_id );
 			if ( $existing ) { continue; }
 
-			$plan_price          = (float) $order->get_meta( '_irembopay_plan_price' );
-			$plan_interval_value = (int) $order->get_meta( '_irembopay_plan_interval_value' );
-			$plan_interval_unit  = $order->get_meta( '_irembopay_plan_interval_unit' );
-			$plan_dur_value      = (int) $order->get_meta( '_irembopay_plan_total_duration_value' );
-			$plan_dur_unit       = $order->get_meta( '_irembopay_plan_total_duration_unit' );
-			$plan_grace          = (int) $order->get_meta( '_irembopay_plan_grace_period' );
-			$plan_total_payments = (int) $order->get_meta( '_irembopay_plan_total_payments' );
+			$period   = get_post_meta( $product_id, '_irembopay_billing_cycle_unit',  true ) ?: 'month';
+			$interval = (int) get_post_meta( $product_id, '_irembopay_billing_cycle_value', true ) ?: 1;
+			$grace    = (int) get_post_meta( $product_id, '_irembopay_grace_period',        true ) ?: 3;
+			$amount   = (float) ( $item->get_total() / max( 1, $item->get_quantity() ) );
 
-			if ( $plan_price > 0 && $plan_interval_value > 0 && ! empty( $plan_interval_unit ) ) {
-				$amount   = $plan_price;
-				$period   = $plan_interval_unit;
-				$interval = $plan_interval_value;
-				$grace    = max( 0, $plan_grace );
-			} else {
-				// Fallback for non-plan subscription products
-				$period   = get_post_meta( $product_id, '_irembopay_sub_period',   true ) ?: 'month';
-				$interval = (int) get_post_meta( $product_id, '_irembopay_sub_interval', true ) ?: 1;
-				$grace    = (int) get_post_meta( $product_id, '_irembopay_sub_grace',    true ) ?: 3;
-				$amount   = (float) ( $item->get_total() / max( 1, $item->get_quantity() ) );
-				$plan_total_payments = 0;
-			}
-
-			$now      = current_time( 'mysql' );
-			$end_date = ( $plan_total_payments > 0 && $plan_dur_value > 0 && ! empty( $plan_dur_unit ) )
-				? self::calc_end_date( $now, $plan_dur_value, $plan_dur_unit )
-				: null;
+			$now = current_time( 'mysql' );
 
 			$sub_id = IremboPay_Subscription_DB::insert( [
 				'user_id'          => (int) $order->get_customer_id(),
@@ -60,31 +40,11 @@ class IremboPay_Subscription_Manager {
 				'currency'         => $order->get_currency(),
 				'next_renewal'     => self::calc_next_renewal( $now, $period, $interval ),
 				'start_date'       => $now,
-				'end_date'         => $end_date,
+				'end_date'         => null,
 				'grace_period_days'=> $grace,
 			] );
 
 			if ( ! $sub_id ) { continue; }
-
-			$order->update_meta_data( '_irembopay_plan_payments_made', 1 );
-			$order->save();
-
-			if ( $plan_total_payments > 0 ) {
-				update_option( 'irembopay_plan_data_' . $sub_id, [
-					'payments_made'  => 1,
-					'total_payments' => $plan_total_payments,
-				], false );
-
-				if ( $plan_total_payments === 1 ) {
-					IremboPay_Subscription_DB::update( $sub_id, [ 'status' => self::STATUS_OWNED ] );
-					$sub = IremboPay_Subscription_DB::get( $sub_id );
-					delete_option( 'irembopay_plan_data_' . $sub_id );
-					do_action( 'irembopay_subscription_owned', $sub_id, $order );
-					if ( $sub ) { self::send_course_owned_email( $sub, $order ); }
-					IremboPay_Logger::info( "Subscription #{$sub_id} fully paid in one payment — marked as owned." );
-					continue;
-				}
-			}
 
 			$order->add_order_note( sprintf(
 				__( 'IremboPay subscription #%d created. Next renewal: %s', 'wc-irembopay' ),
@@ -118,7 +78,7 @@ class IremboPay_Subscription_Manager {
 		$renewal_order = self::create_renewal_order( $sub );
 		if ( ! $renewal_order ) { IremboPay_Logger::error( "Failed to create renewal order for subscription #{$sub->id}." ); return; }
 
-		$product_code  = get_post_meta( $sub->product_id, '_irembopay_sub_product_code', true ) ?: ( $settings['product_code'] ?? '' );
+		$product_code  = get_post_meta( $sub->product_id, '_irembopay_product_code', true ) ?: ( $settings['product_code'] ?? '' );
 		$payment_items = [ array_filter( [ 'unitAmount' => (int) round( $sub->amount ), 'quantity' => 1, 'code' => $product_code ?: null ] ) ];
 
 		$expiry_hours = (int) ( $settings['invoice_expiry_hours'] ?? 24 );
@@ -167,31 +127,6 @@ class IremboPay_Subscription_Manager {
 	}
 
 	public static function complete_renewal( object $sub, WC_Order $renewal_order ): void {
-		$plan_data = get_option( 'irembopay_plan_data_' . $sub->id, [] );
-
-		if ( ! empty( $plan_data ) ) {
-			$payments_made  = (int) $plan_data['payments_made'] + 1;
-			$total_payments = (int) $plan_data['total_payments'];
-
-			if ( $payments_made >= $total_payments ) {
-				IremboPay_Subscription_DB::update( $sub->id, [ 'status' => self::STATUS_OWNED ] );
-				delete_option( 'irembopay_plan_data_' . $sub->id );
-				$renewal_order->add_order_note( sprintf(
-					__( 'IremboPay subscription #%d fully paid (%d/%d). Course ownership granted.', 'wc-irembopay' ),
-					$sub->id, $payments_made, $total_payments
-				) );
-				do_action( 'irembopay_subscription_owned', $sub->id, $renewal_order );
-				self::send_course_owned_email( $sub, $renewal_order );
-				IremboPay_Logger::info( "Subscription #{$sub->id} fully paid ({$payments_made}/{$total_payments}) — marked as owned." );
-				return;
-			}
-
-			update_option( 'irembopay_plan_data_' . $sub->id, [
-				'payments_made'  => $payments_made,
-				'total_payments' => $total_payments,
-			], false );
-		}
-
 		$next = self::calc_next_renewal( current_time( 'mysql' ), $sub->billing_period, (int) $sub->billing_interval );
 		IremboPay_Subscription_DB::update( $sub->id, [
 			'status'           => self::STATUS_ACTIVE,
@@ -250,16 +185,6 @@ class IremboPay_Subscription_Manager {
 			case 'week': $ts = strtotime( "+{$interval} week",  $ts ); break;
 			case 'year': $ts = strtotime( "+{$interval} year",  $ts ); break;
 			default:     $ts = strtotime( "+{$interval} month", $ts ); break;
-		}
-		return date( 'Y-m-d H:i:s', $ts );
-	}
-
-	private static function calc_end_date( string $from, int $duration_value, string $duration_unit ): string {
-		$ts = strtotime( $from );
-		switch ( $duration_unit ) {
-			case 'day':  $ts = strtotime( "+{$duration_value} day",   $ts ); break;
-			case 'week': $ts = strtotime( "+{$duration_value} week",  $ts ); break;
-			default:     $ts = strtotime( "+{$duration_value} month", $ts ); break;
 		}
 		return date( 'Y-m-d H:i:s', $ts );
 	}
@@ -333,21 +258,6 @@ class IremboPay_Subscription_Manager {
 		$renewal_order->add_order_note( sprintf( __( 'Renewal payment email sent to %s.', 'wc-irembopay' ), $user->user_email ) );
 	}
 
-	public static function send_course_owned_email( object $sub, WC_Order $order ): void {
-		$user = get_userdata( $sub->user_id );
-		if ( ! $user ) { return; }
-
-		$site_name     = get_bloginfo( 'name' );
-		$customer_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
-		$product_name  = get_the_title( $sub->product_id ) ?: __( 'your course', 'wc-irembopay' );
-
-		$subject = sprintf( __( '[%s] Congratulations — you now own your course!', 'wc-irembopay' ), $site_name );
-		$message = self::owned_email_html( compact( 'site_name', 'customer_name', 'product_name' ) );
-
-		wp_mail( $user->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
-		$order->add_order_note( sprintf( __( 'Course ownership email sent to %s.', 'wc-irembopay' ), $user->user_email ) );
-	}
-
 	private static function renewal_email_html( array $d ): string {
 		ob_start(); ?>
 <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
@@ -379,27 +289,4 @@ body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
 <?php return ob_get_clean();
 	}
 
-	private static function owned_email_html( array $d ): string {
-		ob_start(); ?>
-<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
-.w{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-.h{background:#16a34a;color:#fff;padding:28px 32px}.h h1{margin:0;font-size:22px}
-.b{padding:32px;color:#333;line-height:1.7}
-.box{background:#f0fdf4;border-left:4px solid #16a34a;padding:16px 20px;border-radius:4px;margin:20px 0;font-size:1.1em}
-.foot{background:#f9f9f9;padding:14px 32px;font-size:12px;color:#aaa;text-align:center}
-</style></head><body>
-<div class="w">
-<div class="h"><h1><?php echo esc_html( $d['site_name'] ); ?></h1></div>
-<div class="b">
-<p><?php printf( esc_html__( 'Hello %s,', 'wc-irembopay' ), esc_html( $d['customer_name'] ) ); ?></p>
-<h2 style="color:#15803d"><?php esc_html_e( '🎉 Congratulations!', 'wc-irembopay' ); ?></h2>
-<p><?php printf( esc_html__( 'You have completed all payments for %s.', 'wc-irembopay' ), '<strong>' . esc_html( $d['product_name'] ) . '</strong>' ); ?></p>
-<div class="box"><?php esc_html_e( 'You now own this course — no further payments are required. Enjoy lifetime access!', 'wc-irembopay' ); ?></div>
-<p><?php esc_html_e( 'Thank you for your commitment. We hope you enjoy the course!', 'wc-irembopay' ); ?></p>
-</div>
-<div class="foot">&copy; <?php echo date('Y'); ?> <?php echo esc_html( $d['site_name'] ); ?></div>
-</div></body></html>
-<?php return ob_get_clean();
-	}
 }
