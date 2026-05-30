@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.3
+- Fix: Subscription products now show "Subscribe" button instead of "Read more"
+- Fix: All plans now displayed on course card and product page
+
 ### v2.4.2
 - Fix: Database tables now auto-created on plugin load, not just on activation
 - Fix: Prevents silent save failures when plugin is deployed by copying files

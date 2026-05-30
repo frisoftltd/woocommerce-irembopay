@@ -9,6 +9,8 @@ class IremboPay_Subscription_Product {
 		add_action( 'woocommerce_process_product_meta', [ $this, 'save_subscription_data' ] );
 		add_filter( 'woocommerce_get_price_html',       [ $this, 'subscription_price_html' ], 10, 2 );
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
+		add_filter( 'woocommerce_is_purchasable',                  [ $this, 'is_purchasable' ], 10, 2 );
+		add_filter( 'woocommerce_product_add_to_cart_text',        [ $this, 'add_to_cart_text' ], 10, 2 );
 
 		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_plan_selector' ] );
 		add_filter( 'woocommerce_add_cart_item_data',              [ $this, 'add_plan_to_cart_item' ], 10, 3 );
@@ -274,13 +276,31 @@ class IremboPay_Subscription_Product {
 		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return $price; }
 		$plans = IremboPay_Subscription_Plans_DB::get_by_product( $product->get_id() );
 		if ( empty( $plans ) ) { return $price; }
-		$plan = $plans[0];
-		$unit_s = [ 'day' => __( 'day', 'wc-irembopay' ), 'week' => __( 'week', 'wc-irembopay' ), 'month' => __( 'month', 'wc-irembopay' ) ];
-		$unit_p = [ 'day' => __( 'days', 'wc-irembopay' ), 'week' => __( 'weeks', 'wc-irembopay' ), 'month' => __( 'months', 'wc-irembopay' ) ];
-		$unit   = (int) $plan->interval_value === 1
-			? ( $unit_s[ $plan->interval_unit ] ?? $plan->interval_unit )
-			: $plan->interval_value . ' ' . ( $unit_p[ $plan->interval_unit ] ?? $plan->interval_unit );
-		return wc_price( $plan->price ) . ' <span class="irembopay-sub-period">/ ' . esc_html( $unit ) . '</span>';
+		$parts = [];
+		foreach ( $plans as $plan ) {
+			$parts[] = sprintf(
+				'<span style="display:block;font-size:13px;">%s: %s Rwf / %d %s</span>',
+				esc_html( $plan->plan_name ),
+				number_format( (float) $plan->price, 0 ),
+				(int) $plan->interval_value,
+				esc_html( $plan->interval_unit )
+			);
+		}
+		return implode( '', $parts );
+	}
+
+	public function is_purchasable( bool $purchasable, $product ): bool {
+		if ( 'yes' === get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
+			return true;
+		}
+		return $purchasable;
+	}
+
+	public function add_to_cart_text( string $text, $product ): string {
+		if ( 'yes' === get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
+			return __( 'Subscribe', 'wc-irembopay' );
+		}
+		return $text;
 	}
 
 	public function sold_individually( bool $sold, WC_Product $product ): bool {
