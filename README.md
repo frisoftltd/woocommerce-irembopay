@@ -142,6 +142,12 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.7
+- Fix: Plan selector now inside WooCommerce form — plan price correctly passed to checkout
+- Fix: Removed duplicate Subscribe button — WooCommerce button used directly
+- Fix: Subscribe redirects directly to checkout
+- Fix: Checkout now shows correct plan price instead of 0 Rwf
+
 ### v2.4.6
 - Fix: Radio buttons restored on plan selector
 - Fix: Subscribe button now shows below plan options

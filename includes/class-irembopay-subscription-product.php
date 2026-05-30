@@ -11,11 +11,13 @@ class IremboPay_Subscription_Product {
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
 		add_filter( 'woocommerce_is_purchasable',                  [ $this, 'is_purchasable' ], 10, 2 );
 		add_filter( 'woocommerce_product_add_to_cart_text',        [ $this, 'add_to_cart_text' ], 10, 2 );
-		add_filter( 'woocommerce_add_to_cart_redirect',            [ $this, 'skip_cart_redirect' ], 10, 2 );
+		add_filter( 'woocommerce_add_to_cart_redirect',            [ $this, 'skip_cart_redirect' ] );
 		add_action( 'wp_footer',                                   [ $this, 'enqueue_plan_selector_script' ] );
 
 		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_plan_selector' ] );
 		add_filter( 'woocommerce_add_cart_item_data',              [ $this, 'add_plan_to_cart_item' ], 10, 3 );
+		add_filter( 'woocommerce_add_cart_item',                   [ $this, 'set_plan_price_in_cart' ] );
+		add_filter( 'woocommerce_get_cart_item_from_session',      [ $this, 'set_plan_price_in_cart' ] );
 		add_filter( 'woocommerce_get_item_data',                   [ $this, 'display_plan_in_cart' ], 10, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'save_plan_to_order' ], 10, 4 );
 	}
@@ -209,55 +211,61 @@ class IremboPay_Subscription_Product {
 		$plans = IremboPay_Subscription_Plans_DB::get_by_product( $product->get_id() );
 		if ( empty( $plans ) ) { return; }
 
-		$unit_singular = [
-			'day'   => __( 'day',   'wc-irembopay' ),
-			'week'  => __( 'week',  'wc-irembopay' ),
-			'month' => __( 'month', 'wc-irembopay' ),
-		];
-		$unit_plural = [
-			'day'   => __( 'days',   'wc-irembopay' ),
-			'week'  => __( 'weeks',  'wc-irembopay' ),
-			'month' => __( 'months', 'wc-irembopay' ),
-		];
-		?>
-		<div class="irembopay-plan-selector" style="margin-bottom:1.4em">
-			<p style="font-weight:bold;margin-bottom:.6em"><?php esc_html_e( 'Choose your plan:', 'wc-irembopay' ); ?></p>
-			<?php foreach ( $plans as $i => $plan ) :
-				$int_unit  = (int) $plan->interval_value === 1
-					? ( $unit_singular[ $plan->interval_unit ] ?? $plan->interval_unit )
-					: $plan->interval_value . ' ' . ( $unit_plural[ $plan->interval_unit ] ?? $plan->interval_unit );
-				$dur_label = $plan->total_duration_value . ' ' . ( (int) $plan->total_duration_value === 1
-					? ( $unit_singular[ $plan->total_duration_unit ] ?? $plan->total_duration_unit )
-					: ( $unit_plural[ $plan->total_duration_unit ] ?? $plan->total_duration_unit ) );
-			?>
-				<label style="display:block;margin-bottom:.5em;cursor:pointer;padding:8px 12px;border:1px solid #ddd;border-radius:4px">
-					<input type="radio" name="irembopay_plan_id"
-					       value="<?php echo esc_attr( $plan->id ); ?>"
-					       <?php echo $i === 0 ? 'checked' : ''; ?>>
-					<strong><?php echo esc_html( $plan->plan_name ); ?></strong>
-					— <?php echo wc_price( $plan->price ); ?>/<?php echo esc_html( $int_unit ); ?>
-					<span style="color:#666;font-size:.88em">
-						(<?php printf( esc_html__( '%s total', 'wc-irembopay' ), esc_html( $dur_label ) ); ?>)
-					</span>
-				</label>
-			<?php endforeach; ?>
-		</div>
-		<?php
+		echo '<div class="irembopay-plan-selector" style="margin-bottom:16px;">';
+		echo '<p style="font-weight:600;margin-bottom:8px;font-size:14px;">' . esc_html__( 'Choose your plan', 'wc-irembopay' ) . '</p>';
+		echo '<div style="display:flex;flex-direction:column;gap:8px;">';
+
+		foreach ( $plans as $i => $plan ) {
+			$checked      = $i === 0;
+			$border_color = $checked ? '#2271b1' : '#ddd';
+			$bg_color     = $checked ? '#f0f6ff' : '#fff';
+			$label        = sprintf( '%s — %s Rwf / %d %s',
+				esc_html( $plan->plan_name ),
+				number_format( (float) $plan->price, 0 ),
+				(int) $plan->interval_value,
+				esc_html( $plan->interval_unit )
+			);
+			printf(
+				'<label class="irembopay-plan-option" style="display:flex;align-items:center;gap:10px;border:2px solid %s;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;background:%s;">
+					<input type="radio" name="_irembopay_chosen_plan_id" class="irembopay-plan-radio" value="%d" %s style="width:16px;height:16px;accent-color:#2271b1;cursor:pointer;flex-shrink:0;">
+					<span>%s</span>
+				</label>',
+				esc_attr( $border_color ),
+				esc_attr( $bg_color ),
+				(int) $plan->id,
+				$checked ? 'checked' : '',
+				$label
+			);
+		}
+
+		echo '</div></div>';
 	}
 
 	public function add_plan_to_cart_item( array $cart_item_data, int $product_id, int $variation_id ): array {
-		if ( 'yes' !== get_post_meta( $product_id, '_irembopay_is_subscription', true ) ) { return $cart_item_data; }
-		$plan_id = absint( $_POST['irembopay_plan_id'] ?? 0 );
-		if ( ! $plan_id ) { return $cart_item_data; }
-		$plan = IremboPay_Subscription_Plans_DB::get( $plan_id );
-		if ( ! $plan || (int) $plan->product_id !== $product_id ) { return $cart_item_data; }
-		$cart_item_data['irembopay_plan_id'] = $plan_id;
+		$plan_id = isset( $_POST['_irembopay_chosen_plan_id'] ) ? (int) $_POST['_irembopay_chosen_plan_id'] : 0;
+		if ( ! $plan_id ) {
+			$plans   = IremboPay_Subscription_Plans_DB::get_by_product( $product_id );
+			$plan_id = $plans ? (int) $plans[0]->id : 0;
+		}
+		if ( $plan_id ) {
+			$cart_item_data['_irembopay_chosen_plan_id'] = $plan_id;
+			$cart_item_data['unique_key']                = md5( microtime() . rand() );
+		}
 		return $cart_item_data;
 	}
 
+	public function set_plan_price_in_cart( array $cart_item ): array {
+		if ( empty( $cart_item['_irembopay_chosen_plan_id'] ) ) { return $cart_item; }
+		$plan = IremboPay_Subscription_Plans_DB::get( (int) $cart_item['_irembopay_chosen_plan_id'] );
+		if ( $plan && isset( $cart_item['data'] ) ) {
+			$cart_item['data']->set_price( $plan->price );
+		}
+		return $cart_item;
+	}
+
 	public function display_plan_in_cart( array $item_data, array $cart_item ): array {
-		if ( empty( $cart_item['irembopay_plan_id'] ) ) { return $item_data; }
-		$plan = IremboPay_Subscription_Plans_DB::get( (int) $cart_item['irembopay_plan_id'] );
+		if ( empty( $cart_item['_irembopay_chosen_plan_id'] ) ) { return $item_data; }
+		$plan = IremboPay_Subscription_Plans_DB::get( (int) $cart_item['_irembopay_chosen_plan_id'] );
 		if ( $plan ) {
 			$item_data[] = [
 				'key'   => __( 'Plan', 'wc-irembopay' ),
@@ -268,53 +276,24 @@ class IremboPay_Subscription_Product {
 	}
 
 	public function save_plan_to_order( \WC_Order_Item_Product $item, string $cart_item_key, array $cart_item_values, \WC_Order $order ): void {
-		if ( empty( $cart_item_values['irembopay_plan_id'] ) ) { return; }
-		$plan_id = (int) $cart_item_values['irembopay_plan_id'];
+		if ( empty( $cart_item_values['_irembopay_chosen_plan_id'] ) ) { return; }
+		$plan_id = (int) $cart_item_values['_irembopay_chosen_plan_id'];
 		$item->add_meta_data( '_irembopay_chosen_plan_id', $plan_id, true );
 		$order->update_meta_data( '_irembopay_chosen_plan_id', $plan_id );
 	}
 
-	public function subscription_price_html( string $price, WC_Product $product ): string {
+	public function subscription_price_html( string $price, $product ): string {
 		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return $price; }
 		$plans = IremboPay_Subscription_Plans_DB::get_by_product( $product->get_id() );
 		if ( empty( $plans ) ) { return $price; }
-
-		$pid  = $product->get_id();
-		$html = '<p style="font-weight:600;margin-bottom:8px;font-size:13px;">' . esc_html__( 'Choose your plan', 'wc-irembopay' ) . '</p>';
-		$html .= '<div class="irembopay-plan-selector" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">';
-
-		foreach ( $plans as $i => $plan ) {
-			$checked = $i === 0 ? 'checked' : '';
-			$label   = sprintf( '%s — %s Rwf / %d %s',
-				esc_html( $plan->plan_name ),
-				number_format( (float) $plan->price, 0 ),
-				(int) $plan->interval_value,
-				esc_html( $plan->interval_unit )
-			);
-			$html .= sprintf(
-				'<label class="irembopay-plan-option" style="display:flex;align-items:center;gap:10px;border:2px solid #ddd;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;background:#fff;">
-					<input type="radio" name="irembopay_plan_id_%1$d" class="irembopay-plan-radio" value="%2$d" data-product="%1$d" %3$s style="width:16px;height:16px;accent-color:#2271b1;cursor:pointer;flex-shrink:0;">
-					<span>%4$s</span>
-				</label>',
-				$pid,
-				(int) $plan->id,
-				$checked,
-				$label
-			);
-		}
-
-		$html .= '</div>';
-		$html .= sprintf(
-			'<input type="hidden" name="_irembopay_chosen_plan_id" id="irembopay_chosen_plan_%1$d" value="%2$d">
-			<button type="submit" class="button alt wp-element-button irembopay-subscribe-btn" style="width:100%%;margin-top:12px;padding:12px;font-size:14px;font-weight:600;background:#2271b1;color:#fff;border:none;border-radius:6px;cursor:pointer;">
-				%3$s
-			</button>',
-			$pid,
-			(int) $plans[0]->id,
-			esc_html__( 'Subscribe', 'wc-irembopay' )
+		$first = $plans[0];
+		return sprintf(
+			'<span class="irembopay-from-price">%s %s Rwf / %d %s</span>',
+			esc_html__( 'From', 'wc-irembopay' ),
+			number_format( (float) $first->price, 0 ),
+			(int) $first->interval_value,
+			esc_html( $first->interval_unit )
 		);
-
-		return $html;
 	}
 
 	public function enqueue_plan_selector_script(): void {
@@ -323,13 +302,8 @@ class IremboPay_Subscription_Product {
 		(function($){
 			$(document).ready(function(){
 				$(document).on('change', '.irembopay-plan-radio', function(){
-					var productId = $(this).data('product');
-					var planId    = $(this).val();
-					$('#irembopay_chosen_plan_' + productId).val(planId);
-					$('.irembopay-plan-option').css({'border-color':'#ddd','background':'#fff'});
-					$(this).closest('label').css({'border-color':'#2271b1','background':'#f0f6ff'});
-				});
-				$('.irembopay-plan-radio:checked').each(function(){
+					var $selector = $(this).closest('.irembopay-plan-selector');
+					$selector.find('.irembopay-plan-option').css({'border-color':'#ddd','background':'#fff'});
 					$(this).closest('label').css({'border-color':'#2271b1','background':'#f0f6ff'});
 				});
 			});
@@ -338,11 +312,15 @@ class IremboPay_Subscription_Product {
 		<?php
 	}
 
-	public function skip_cart_redirect( $url, $product ) {
-		if ( $product && 'yes' === get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
-			return wc_get_checkout_url();
+	public function skip_cart_redirect( $url ): string {
+		if ( WC()->cart ) {
+			foreach ( WC()->cart->get_cart() as $item ) {
+				if ( ! empty( $item['_irembopay_chosen_plan_id'] ) ) {
+					return wc_get_checkout_url();
+				}
+			}
 		}
-		return $url;
+		return (string) $url;
 	}
 
 	public function is_purchasable( bool $purchasable, $product ): bool {
