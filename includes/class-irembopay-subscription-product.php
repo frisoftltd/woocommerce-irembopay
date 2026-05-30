@@ -11,6 +11,7 @@ class IremboPay_Subscription_Product {
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
 		add_filter( 'woocommerce_is_purchasable',                  [ $this, 'is_purchasable' ], 10, 2 );
 		add_filter( 'woocommerce_product_add_to_cart_text',        [ $this, 'add_to_cart_text' ], 10, 2 );
+		add_action( 'wp_footer',                                   [ $this, 'enqueue_plan_selector_script' ] );
 
 		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_plan_selector' ] );
 		add_filter( 'woocommerce_add_cart_item_data',              [ $this, 'add_plan_to_cart_item' ], 10, 3 );
@@ -303,27 +304,33 @@ class IremboPay_Subscription_Product {
 
 		$html .= '</div>';
 		$html .= sprintf(
-			'<input type="hidden" name="_irembopay_chosen_plan_id" id="irembopay_chosen_plan_%1$d" value="%2$d">
-			<script>(function(){
-				document.querySelectorAll(".irembopay-plan-radio[data-product=\'%1$d\']").forEach(function(r){
-					r.addEventListener("change",function(){
-						document.getElementById("irembopay_chosen_plan_%1$d").value=this.value;
-						document.querySelectorAll(".irembopay-plan-option").forEach(function(l){l.style.borderColor="#ddd";l.style.background="#fff";});
-						this.closest("label").style.borderColor="#2271b1";
-						this.closest("label").style.background="#f0f6ff";
-					});
-					if(r.checked){
-						r.closest("label").style.borderColor="#2271b1";
-						r.closest("label").style.background="#f0f6ff";
-						document.getElementById("irembopay_chosen_plan_%1$d").value=r.value;
-					}
-				});
-			})();</script>',
+			'<input type="hidden" name="_irembopay_chosen_plan_id" id="irembopay_chosen_plan_%1$d" value="%2$d">',
 			$pid,
 			(int) $plans[0]->id
 		);
 
 		return $html;
+	}
+
+	public function enqueue_plan_selector_script(): void {
+		?>
+		<script>
+		(function($){
+			$(document).ready(function(){
+				$(document).on('change', '.irembopay-plan-radio', function(){
+					var productId = $(this).data('product');
+					var planId    = $(this).val();
+					$('#irembopay_chosen_plan_' + productId).val(planId);
+					$('.irembopay-plan-option').css({'border-color':'#ddd','background':'#fff'});
+					$(this).closest('label').css({'border-color':'#2271b1','background':'#f0f6ff'});
+				});
+				$('.irembopay-plan-radio:checked').each(function(){
+					$(this).closest('label').css({'border-color':'#2271b1','background':'#f0f6ff'});
+				});
+			});
+		})(jQuery);
+		</script>
+		<?php
 	}
 
 	public function is_purchasable( bool $purchasable, $product ): bool {

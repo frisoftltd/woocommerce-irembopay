@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.5
+- Fix: Plan selector JavaScript no longer renders as visible text on the page
+- Fix: Variable conflict error resolved by moving JS to wp_footer
+
 ### v2.4.4
 - New: Plan selector with radio buttons shown on course card and product page
 - New: Selected plan highlighted with blue border
