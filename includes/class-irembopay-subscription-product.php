@@ -11,6 +11,7 @@ class IremboPay_Subscription_Product {
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
 		add_filter( 'woocommerce_is_purchasable',                  [ $this, 'is_purchasable' ], 10, 2 );
 		add_filter( 'woocommerce_product_add_to_cart_text',        [ $this, 'add_to_cart_text' ], 10, 2 );
+		add_filter( 'woocommerce_add_to_cart_redirect',            [ $this, 'skip_cart_redirect' ], 10, 2 );
 		add_action( 'wp_footer',                                   [ $this, 'enqueue_plan_selector_script' ] );
 
 		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_plan_selector' ] );
@@ -291,9 +292,9 @@ class IremboPay_Subscription_Product {
 				esc_html( $plan->interval_unit )
 			);
 			$html .= sprintf(
-				'<label style="display:flex;align-items:center;gap:10px;border:2px solid #ddd;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;background:#fff;transition:border-color 0.2s;" class="irembopay-plan-option">
-					<input type="radio" name="irembopay_plan_id_%1$d" class="irembopay-plan-radio" value="%2$d" data-product="%1$d" %3$s style="width:16px;height:16px;accent-color:#2271b1;cursor:pointer;">
-					%4$s
+				'<label class="irembopay-plan-option" style="display:flex;align-items:center;gap:10px;border:2px solid #ddd;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;background:#fff;">
+					<input type="radio" name="irembopay_plan_id_%1$d" class="irembopay-plan-radio" value="%2$d" data-product="%1$d" %3$s style="width:16px;height:16px;accent-color:#2271b1;cursor:pointer;flex-shrink:0;">
+					<span>%4$s</span>
 				</label>',
 				$pid,
 				(int) $plan->id,
@@ -304,9 +305,13 @@ class IremboPay_Subscription_Product {
 
 		$html .= '</div>';
 		$html .= sprintf(
-			'<input type="hidden" name="_irembopay_chosen_plan_id" id="irembopay_chosen_plan_%1$d" value="%2$d">',
+			'<input type="hidden" name="_irembopay_chosen_plan_id" id="irembopay_chosen_plan_%1$d" value="%2$d">
+			<button type="submit" class="button alt wp-element-button irembopay-subscribe-btn" style="width:100%%;margin-top:12px;padding:12px;font-size:14px;font-weight:600;background:#2271b1;color:#fff;border:none;border-radius:6px;cursor:pointer;">
+				%3$s
+			</button>',
 			$pid,
-			(int) $plans[0]->id
+			(int) $plans[0]->id,
+			esc_html__( 'Subscribe', 'wc-irembopay' )
 		);
 
 		return $html;
@@ -331,6 +336,13 @@ class IremboPay_Subscription_Product {
 		})(jQuery);
 		</script>
 		<?php
+	}
+
+	public function skip_cart_redirect( $url, $product ) {
+		if ( $product && 'yes' === get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
+			return wc_get_checkout_url();
+		}
+		return $url;
 	}
 
 	public function is_purchasable( bool $purchasable, $product ): bool {

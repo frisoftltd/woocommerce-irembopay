@@ -142,6 +142,11 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.6
+- Fix: Radio buttons restored on plan selector
+- Fix: Subscribe button now shows below plan options
+- Fix: Redirects to checkout instead of showing View Cart
+
 ### v2.4.5
 - Fix: Plan selector JavaScript no longer renders as visible text on the page
 - Fix: Variable conflict error resolved by moving JS to wp_footer
