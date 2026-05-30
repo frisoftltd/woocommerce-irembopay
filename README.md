@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.1
+- Fix: Subscription plan data now saves correctly
+- Fix: Regular price and Sale price fields hidden when subscription is enabled
+
 ### v2.4.0
 - New: Subscription plan system — each product supports up to 3 configurable plans
 - New: Each plan has its own price, billing interval, total duration and grace period

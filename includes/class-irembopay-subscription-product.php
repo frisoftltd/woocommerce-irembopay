@@ -6,7 +6,7 @@ class IremboPay_Subscription_Product {
 	public function __construct() {
 		add_filter( 'woocommerce_product_data_tabs',    [ $this, 'add_tab' ] );
 		add_action( 'woocommerce_product_data_panels',  [ $this, 'render_panel' ] );
-		add_action( 'woocommerce_process_product_meta', [ $this, 'save_fields' ] );
+		add_action( 'woocommerce_process_product_meta', [ $this, 'save_subscription_data' ] );
 		add_filter( 'woocommerce_get_price_html',       [ $this, 'subscription_price_html' ], 10, 2 );
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
 
@@ -133,7 +133,15 @@ class IremboPay_Subscription_Product {
 			</div>
 		</div>
 		<script>jQuery(function($){
-			$('#_irembopay_is_subscription').on('change', function(){ $('.irembopay-sub-fields').toggle(this.checked); });
+			function irembopayTogglePriceFields() {
+				var isSub = $('#_irembopay_is_subscription').is(':checked');
+				$('._regular_price_field, ._sale_price_field').toggle( ! isSub );
+			}
+			irembopayTogglePriceFields();
+			$('#_irembopay_is_subscription').on('change', function(){
+				$('.irembopay-sub-fields').toggle(this.checked);
+				irembopayTogglePriceFields();
+			});
 			$('.irembopay-add-plan').on('click', function(e){
 				e.preventDefault();
 				var n = $(this).data('plan');
@@ -151,22 +159,29 @@ class IremboPay_Subscription_Product {
 		<?php
 	}
 
-	public function save_fields( int $product_id ): void {
+	public function save_subscription_data( int $product_id ): void {
+		// Skip autosaves and revisions — $_POST won't contain our plan fields
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
+		if ( wp_is_post_revision( $product_id ) ) { return; }
+		if ( get_post_type( $product_id ) !== 'product' ) { return; }
+		// Plan fields are only present when the product form was fully submitted
+		if ( ! isset( $_POST['_irembopay_plan'] ) ) { return; }
+
 		update_post_meta( $product_id, '_irembopay_is_subscription', isset( $_POST['_irembopay_is_subscription'] ) ? 'yes' : 'no' );
 		update_post_meta( $product_id, '_irembopay_product_code', sanitize_text_field( $_POST['_irembopay_product_code'] ?? '' ) );
 
-		$raw_plans   = isset( $_POST['_irembopay_plan'] ) ? (array) $_POST['_irembopay_plan'] : [];
+		$raw_plans   = (array) $_POST['_irembopay_plan'];
 		$valid_units = [ 'day', 'week', 'month' ];
 		$plans       = [];
 
 		foreach ( [ 1, 2, 3 ] as $n ) {
-			$p     = $raw_plans[ $n ] ?? [];
+			$p     = isset( $raw_plans[ $n ] ) ? (array) $raw_plans[ $n ] : [];
 			$name  = sanitize_text_field( $p['name'] ?? '' );
 			$price = (float) ( $p['price'] ?? 0 );
 			if ( empty( $name ) || $price <= 0 ) { continue; }
 
-			$int_unit  = in_array( $p['interval_unit'] ?? '', $valid_units, true ) ? $p['interval_unit'] : 'month';
-			$dur_unit  = in_array( $p['total_duration_unit'] ?? '', $valid_units, true ) ? $p['total_duration_unit'] : 'month';
+			$int_unit = in_array( $p['interval_unit'] ?? '', $valid_units, true ) ? $p['interval_unit'] : 'month';
+			$dur_unit = in_array( $p['total_duration_unit'] ?? '', $valid_units, true ) ? $p['total_duration_unit'] : 'month';
 
 			$plans[] = [
 				'plan_number'          => $n,
