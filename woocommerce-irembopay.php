@@ -3,7 +3,7 @@
  * Plugin Name:       WooCommerce IremboPay Gateway
  * Plugin URI:        https://github.com/frisoftltd/woocommerce-irembopay
  * Description:       Accept payments via IremboPay with built-in subscriptions for Tutor LMS.
- * Version:           2.4.1
+ * Version:           2.4.2
  * Author:            Fri Soft Ltd
  * Author URI:        https://frisoft.rw
  * License:           GPL-2.0-or-later
@@ -17,7 +17,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'WC_IREMBOPAY_VERSION',     '2.4.1' );
+define( 'WC_IREMBOPAY_VERSION',     '2.4.2' );
 define( 'WC_IREMBOPAY_PLUGIN_FILE', __FILE__ );
 define( 'WC_IREMBOPAY_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'WC_IREMBOPAY_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
@@ -171,6 +171,14 @@ function wc_irembopay_init(): void {
     WC_IremboPay::instance();
 }
 add_action( 'plugins_loaded', 'wc_irembopay_init', 11 );
+
+function irembopay_maybe_create_tables(): void {
+    $installed = get_option( 'irembopay_plans_db_version', '0' );
+    if ( version_compare( $installed, '1.0', '<' ) ) {
+        IremboPay_Subscription_Plans_DB::create_table();
+    }
+}
+add_action( 'plugins_loaded', 'irembopay_maybe_create_tables', 5 );
 
 register_activation_hook( WC_IREMBOPAY_PLUGIN_FILE, function() {
     require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-db.php';

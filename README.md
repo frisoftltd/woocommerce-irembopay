@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.2
+- Fix: Database tables now auto-created on plugin load, not just on activation
+- Fix: Prevents silent save failures when plugin is deployed by copying files
+
 ### v2.4.1
 - Fix: Subscription plan data now saves correctly
 - Fix: Regular price and Sale price fields hidden when subscription is enabled
