@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.3.3
+- Fix: Installment checkboxes now display as pill buttons, fully visible and properly spaced
+
 ### v2.3.2
 - Fix: Installment checkboxes are now much larger and clearly readable with proper spacing
 

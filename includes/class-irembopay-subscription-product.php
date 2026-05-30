@@ -76,15 +76,45 @@ class IremboPay_Subscription_Product {
 					'description' => __( 'Let customers split this payment into multiple installments.', 'wc-irembopay' ),
 					'value'       => $allow_inst,
 				] ); ?>
-				<p class="form-field irembopay-inst-options" <?php echo $allow_inst !== 'yes' ? 'style="display:none"' : ''; ?>>
-					<label><?php esc_html_e( 'Installment Options', 'wc-irembopay' ); ?></label>
-					<?php foreach ( [ 1, 2, 3, 4, 6 ] as $n ) : ?>
-						<label style="display:inline-flex;align-items:center;justify-content:center;margin-right:16px;margin-bottom:8px;cursor:pointer;font-size:14px;font-weight:600;color:#1d2327">
-							<input type="checkbox" name="_irembopay_installment_options[]" value="<?php echo esc_attr( $n ); ?>" style="width:20px;height:20px;margin-right:6px;cursor:pointer;accent-color:#2271b1" <?php checked( in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true ) ); ?>>
-							<?php echo esc_html( $n ); ?>x
+				<?php if ( $allow_inst !== 'yes' ) : ?>
+				<div class="form-field irembopay-inst-options" style="padding-left:162px; margin-bottom:10px; display:none;">
+				<?php else : ?>
+				<div class="form-field irembopay-inst-options" style="padding-left:162px; margin-bottom:10px;">
+				<?php endif; ?>
+					<label style="display:block; margin-bottom:8px; font-weight:600;"><?php esc_html_e( 'Installment Options', 'wc-irembopay' ); ?></label>
+					<div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:4px;">
+					<?php foreach ( [ 1, 2, 3, 4, 6 ] as $n ) :
+						$checked = in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true );
+					?>
+						<label style="
+							display:flex !important;
+							align-items:center !important;
+							gap:8px !important;
+							font-size:15px !important;
+							font-weight:600 !important;
+							cursor:pointer !important;
+							background:#f0f0f1;
+							border:1px solid #c3c4c7;
+							border-radius:4px;
+							padding:8px 16px !important;
+							min-width:60px;
+							justify-content:center;
+						">
+							<input type="checkbox"
+							       name="_irembopay_installment_options[]"
+							       value="<?php echo esc_attr( $n ); ?>"
+							       style="
+							           width:18px !important;
+							           height:18px !important;
+							           margin:0 !important;
+							           cursor:pointer !important;
+							       "
+							       <?php checked( $checked ); ?>>
+							<span style="font-size:15px !important;"><?php echo esc_html( $n ); ?>x</span>
 						</label>
 					<?php endforeach; ?>
-				</p>
+					</div>
+				</div>
 			</div>
 			<div class="options_group">
 				<?php woocommerce_wp_text_input( [
