@@ -276,17 +276,54 @@ class IremboPay_Subscription_Product {
 		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return $price; }
 		$plans = IremboPay_Subscription_Plans_DB::get_by_product( $product->get_id() );
 		if ( empty( $plans ) ) { return $price; }
-		$parts = [];
-		foreach ( $plans as $plan ) {
-			$parts[] = sprintf(
-				'<span style="display:block;font-size:13px;">%s: %s Rwf / %d %s</span>',
+
+		$pid  = $product->get_id();
+		$html = '<p style="font-weight:600;margin-bottom:8px;font-size:13px;">' . esc_html__( 'Choose your plan', 'wc-irembopay' ) . '</p>';
+		$html .= '<div class="irembopay-plan-selector" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">';
+
+		foreach ( $plans as $i => $plan ) {
+			$checked = $i === 0 ? 'checked' : '';
+			$label   = sprintf( '%s — %s Rwf / %d %s',
 				esc_html( $plan->plan_name ),
 				number_format( (float) $plan->price, 0 ),
 				(int) $plan->interval_value,
 				esc_html( $plan->interval_unit )
 			);
+			$html .= sprintf(
+				'<label style="display:flex;align-items:center;gap:10px;border:2px solid #ddd;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:500;background:#fff;transition:border-color 0.2s;" class="irembopay-plan-option">
+					<input type="radio" name="irembopay_plan_id_%1$d" class="irembopay-plan-radio" value="%2$d" data-product="%1$d" %3$s style="width:16px;height:16px;accent-color:#2271b1;cursor:pointer;">
+					%4$s
+				</label>',
+				$pid,
+				(int) $plan->id,
+				$checked,
+				$label
+			);
 		}
-		return implode( '', $parts );
+
+		$html .= '</div>';
+		$html .= sprintf(
+			'<input type="hidden" name="_irembopay_chosen_plan_id" id="irembopay_chosen_plan_%1$d" value="%2$d">
+			<script>(function(){
+				document.querySelectorAll(".irembopay-plan-radio[data-product=\'%1$d\']").forEach(function(r){
+					r.addEventListener("change",function(){
+						document.getElementById("irembopay_chosen_plan_%1$d").value=this.value;
+						document.querySelectorAll(".irembopay-plan-option").forEach(function(l){l.style.borderColor="#ddd";l.style.background="#fff";});
+						this.closest("label").style.borderColor="#2271b1";
+						this.closest("label").style.background="#f0f6ff";
+					});
+					if(r.checked){
+						r.closest("label").style.borderColor="#2271b1";
+						r.closest("label").style.background="#f0f6ff";
+						document.getElementById("irembopay_chosen_plan_%1$d").value=r.value;
+					}
+				});
+			})();</script>',
+			$pid,
+			(int) $plans[0]->id
+		);
+
+		return $html;
 	}
 
 	public function is_purchasable( bool $purchasable, $product ): bool {

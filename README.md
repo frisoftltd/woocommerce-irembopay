@@ -142,6 +142,11 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.4
+- New: Plan selector with radio buttons shown on course card and product page
+- New: Selected plan highlighted with blue border
+- New: First plan pre-selected by default
+
 ### v2.4.3
 - Fix: Subscription products now show "Subscribe" button instead of "Read more"
 - Fix: All plans now displayed on course card and product page
