@@ -80,15 +80,12 @@ class IremboPay_Subscription_Product {
 			</div>
 		</div>
 		<script>jQuery(function($){
-			function irembopayTogglePriceFields() {
-				var isSub = $('#_irembopay_is_subscription').is(':checked');
-				$('._regular_price_field, ._sale_price_field').toggle( ! isSub );
-			}
-			irembopayTogglePriceFields();
 			$('#_irembopay_is_subscription').on('change', function(){
 				$('.irembopay-sub-fields').toggle(this.checked);
-				irembopayTogglePriceFields();
 			});
+			if($('#_irembopay_is_subscription').is(':checked')){
+				$('.irembopay-sub-fields').show();
+			}
 		});</script>
 		<?php
 	}

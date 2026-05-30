@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.5.1
+- Fix: Regular price field no longer hidden for subscription products
+- Fix: Subscription price now displays correctly on course listing
+
 ### v2.5.0
 - Removed: Subscription plan system (plans, plan selector, cart injection)
 - Cleaned: Plugin returns to simple one-time and recurring payment flow
