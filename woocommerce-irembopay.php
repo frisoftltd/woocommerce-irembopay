@@ -3,7 +3,7 @@
  * Plugin Name:       WooCommerce IremboPay Gateway
  * Plugin URI:        https://github.com/frisoftltd/woocommerce-irembopay
  * Description:       Accept payments via IremboPay with built-in subscriptions for Tutor LMS.
- * Version:           2.3.3
+ * Version:           2.4.0
  * Author:            Fri Soft Ltd
  * Author URI:        https://frisoft.rw
  * License:           GPL-2.0-or-later
@@ -17,7 +17,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
-define( 'WC_IREMBOPAY_VERSION',     '2.3.3' );
+define( 'WC_IREMBOPAY_VERSION',     '2.4.0' );
 define( 'WC_IREMBOPAY_PLUGIN_FILE', __FILE__ );
 define( 'WC_IREMBOPAY_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'WC_IREMBOPAY_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );
@@ -39,9 +39,8 @@ final class WC_IremboPay {
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-db.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-manager.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-cron.php';
+        require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-plans-db.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-product.php';
-        require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-installment-db.php';
-        require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-installment-manager.php';
         require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/admin/class-irembopay-subscriptions-admin.php';
         if ( defined( 'TUTOR_VERSION' ) || class_exists( 'Tutor\Init' ) ) {
             require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-tutor-integration.php';
@@ -116,8 +115,7 @@ final class WC_IremboPay {
         add_action( 'irembopay_subscription_expired',   [ $tutor, 'revoke_course_access' ] );
         add_action( 'irembopay_subscription_activated',      [ $tutor, 'restore_course_access' ], 10, 2 );
         add_action( 'irembopay_subscription_renewed',        [ $tutor, 'restore_course_access' ], 10, 2 );
-        add_action( 'irembopay_installment_access_suspended', [ $tutor, 'revoke_course_access'  ] );
-        add_action( 'irembopay_installment_access_restored',  [ $tutor, 'restore_course_access' ], 10, 2 );
+        add_action( 'irembopay_subscription_owned', [ $tutor, 'restore_course_access' ], 10, 2 );
     }
 
     public function handle_payment_page(): void {
@@ -177,8 +175,8 @@ add_action( 'plugins_loaded', 'wc_irembopay_init', 11 );
 register_activation_hook( WC_IREMBOPAY_PLUGIN_FILE, function() {
     require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-db.php';
     IremboPay_Subscription_DB::create_table();
-    require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-installment-db.php';
-    IremboPay_Installment_DB::create_table();
+    require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-plans-db.php';
+    IremboPay_Subscription_Plans_DB::create_table();
     require_once WC_IREMBOPAY_PLUGIN_DIR . 'includes/class-irembopay-subscription-cron.php';
     IremboPay_Subscription_Cron::schedule();
 });

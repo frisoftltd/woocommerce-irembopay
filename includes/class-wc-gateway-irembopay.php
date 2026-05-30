@@ -115,24 +115,35 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			return [ 'result' => 'failure' ];
 		}
 
-		$transaction_id      = sprintf( 'WC-%d-%s', $order->get_id(), wp_generate_password( 8, false ) );
-		$chosen_installments = max( 1, (int) $order->get_meta( '_irembopay_chosen_installments' ) );
-		$full_total          = (float) $order->get_total();
+		$transaction_id = sprintf( 'WC-%d-%s', $order->get_id(), wp_generate_password( 8, false ) );
 
-		if ( $chosen_installments > 1 ) {
-			$installment_amount = (int) round( $full_total / $chosen_installments, 0 );
-			$order->update_meta_data( '_irembopay_installment_amount', $installment_amount );
-			$order->update_meta_data( '_irembopay_installment_full_amount', $full_total );
+		$chosen_plan_id = (int) $order->get_meta( '_irembopay_chosen_plan_id' );
+		$plan           = $chosen_plan_id ? IremboPay_Subscription_Plans_DB::get( $chosen_plan_id ) : null;
+
+		if ( $plan ) {
+			$total_payments = self::calc_total_payments(
+				(int) $plan->total_duration_value, $plan->total_duration_unit,
+				(int) $plan->interval_value,        $plan->interval_unit
+			);
+			$order->update_meta_data( '_irembopay_plan_id',                   $plan->id );
+			$order->update_meta_data( '_irembopay_plan_price',                 $plan->price );
+			$order->update_meta_data( '_irembopay_plan_interval_value',        $plan->interval_value );
+			$order->update_meta_data( '_irembopay_plan_interval_unit',         $plan->interval_unit );
+			$order->update_meta_data( '_irembopay_plan_total_duration_value',  $plan->total_duration_value );
+			$order->update_meta_data( '_irembopay_plan_total_duration_unit',   $plan->total_duration_unit );
+			$order->update_meta_data( '_irembopay_plan_grace_period',          $plan->grace_period_days );
+			$order->update_meta_data( '_irembopay_plan_total_payments',        $total_payments );
+			$order->update_meta_data( '_irembopay_plan_payments_made',         0 );
 			$order->save();
-			$payment_items = $this->build_installment_payment_items( $order, $installment_amount );
+			$payment_items = $this->build_plan_payment_items( $order, $plan );
 		} else {
 			$payment_items = $this->build_payment_items( $order );
 		}
 
-		$expiry_hours   = (int) $this->get_option( 'invoice_expiry_hours', 24 );
-		$expiry_at      = ( new DateTime( 'now', new DateTimeZone( wp_timezone_string() ) ) )
-		                      ->modify( "+{$expiry_hours} hours" )
-		                      ->format( DateTime::ATOM );
+		$expiry_hours = (int) $this->get_option( 'invoice_expiry_hours', 24 );
+		$expiry_at    = ( new DateTime( 'now', new DateTimeZone( wp_timezone_string() ) ) )
+		                    ->modify( "+{$expiry_hours} hours" )
+		                    ->format( DateTime::ATOM );
 
 		$invoice_data = [
 			'transactionId'            => $transaction_id,
@@ -178,17 +189,14 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 		];
 	}
 
-	private function build_installment_payment_items( WC_Order $order, int $installment_amount ): array {
-		$items      = [];
+	private function build_plan_payment_items( WC_Order $order, object $plan ): array {
+		$item_row   = [ 'unitAmount' => (int) round( $plan->price ), 'quantity' => 1 ];
 		$order_item = array_values( $order->get_items() )[0] ?? null;
-		$item       = [ 'unitAmount' => $installment_amount, 'quantity' => 1 ];
 		if ( $order_item ) {
-			$per_product_code = get_post_meta( $order_item->get_product_id(), '_irembopay_product_code', true );
-			$code = ! empty( $per_product_code ) ? $per_product_code : $this->product_code;
-			if ( ! empty( $code ) ) { $item['code'] = $code; }
+			$code = get_post_meta( $order_item->get_product_id(), '_irembopay_product_code', true ) ?: $this->product_code;
+			if ( ! empty( $code ) ) { $item_row['code'] = $code; }
 		}
-		$items[] = $item;
-		return apply_filters( 'irembopay_payment_items', $items, $order );
+		return apply_filters( 'irembopay_payment_items', [ $item_row ], $order );
 	}
 
 	private function build_payment_items( WC_Order $order ): array {
@@ -206,5 +214,12 @@ class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 			$items[] = $line_item;
 		}
 		return apply_filters( 'irembopay_payment_items', $items, $order );
+	}
+
+	private static function calc_total_payments( int $dur_val, string $dur_unit, int $int_val, string $int_unit ): int {
+		$days     = [ 'day' => 1, 'week' => 7, 'month' => 30 ];
+		$total    = $dur_val * ( $days[ $dur_unit ] ?? 30 );
+		$interval = $int_val  * ( $days[ $int_unit ]  ?? 30 );
+		return max( 1, (int) round( $total / $interval ) );
 	}
 }

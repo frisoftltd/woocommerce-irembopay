@@ -35,18 +35,6 @@ class IremboPay_Webhook {
 			return new WP_REST_Response( [ 'error' => 'Missing required fields' ], 400 );
 		}
 
-		// Check if this invoice belongs to an installment (installments 2+)
-		$installment = class_exists( 'IremboPay_Installment_DB' ) ? IremboPay_Installment_DB::get_by_invoice( $invoice_number ) : null;
-		if ( $installment ) {
-			if ( $payment_status === 'PAID' ) {
-				IremboPay_Installment_Manager::complete_installment_payment( $installment );
-				IremboPay_Logger::info( 'Installment invoice paid: ' . $invoice_number );
-			} elseif ( $payment_status === 'FAILED' ) {
-				IremboPay_Installment_DB::update( (int) $installment->id, [ 'status' => 'failed' ] );
-			}
-			return new WP_REST_Response( [ 'success' => true ], 200 );
-		}
-
 		$orders = wc_get_orders( [
 			'limit'      => 1,
 			'meta_query' => [ [
@@ -76,13 +64,6 @@ class IremboPay_Webhook {
 					if ( $sub ) { IremboPay_Subscription_Manager::complete_renewal( $sub, $order ); }
 				} elseif ( ! $order->get_meta( '_irembopay_renewal' ) ) {
 					IremboPay_Subscription_Manager::create_from_order( $order );
-					// After subscription is created, schedule installments 2..N if applicable
-					if ( class_exists( 'IremboPay_Installment_Manager' ) && (int) $order->get_meta( '_irembopay_chosen_installments' ) > 1 ) {
-						$new_sub = self::get_latest_subscription_for_order( $order );
-						if ( $new_sub ) {
-							IremboPay_Installment_Manager::create_installments_for_order( $order, (int) $new_sub->id );
-						}
-					}
 				}
 				IremboPay_Logger::info( 'Order #' . $order->get_id() . ' marked as paid.' );
 				break;
@@ -100,15 +81,6 @@ class IremboPay_Webhook {
 		}
 
 		return new WP_REST_Response( [ 'success' => true ], 200 );
-	}
-
-	private static function get_latest_subscription_for_order( WC_Order $order ): ?object {
-		global $wpdb;
-		$t = $wpdb->prefix . 'irembopay_subscriptions';
-		return $wpdb->get_row( $wpdb->prepare(
-			"SELECT * FROM {$t} WHERE parent_order_id = %d ORDER BY id DESC LIMIT 1",
-			$order->get_id()
-		) );
 	}
 }
 

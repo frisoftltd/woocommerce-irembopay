@@ -142,6 +142,13 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.4.0
+- New: Subscription plan system — each product supports up to 3 configurable plans
+- New: Each plan has its own price, billing interval, total duration and grace period
+- New: Students pick a plan at checkout; auto-billing runs until course is owned
+- New: Course ownership granted automatically after all payments complete
+- Removed: Installment payment system replaced by subscription plans
+
 ### v2.3.3
 - Fix: Installment checkboxes now display as pill buttons, fully visible and properly spaced
 

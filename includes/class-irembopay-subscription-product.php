@@ -10,10 +10,10 @@ class IremboPay_Subscription_Product {
 		add_filter( 'woocommerce_get_price_html',       [ $this, 'subscription_price_html' ], 10, 2 );
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
 
-		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_installment_dropdown' ] );
-		add_filter( 'woocommerce_add_cart_item_data',              [ $this, 'add_installment_to_cart_item' ], 10, 3 );
-		add_filter( 'woocommerce_get_item_data',                   [ $this, 'display_installment_in_cart' ], 10, 2 );
-		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'save_installment_to_order' ], 10, 4 );
+		add_action( 'woocommerce_before_add_to_cart_button',       [ $this, 'render_plan_selector' ] );
+		add_filter( 'woocommerce_add_cart_item_data',              [ $this, 'add_plan_to_cart_item' ], 10, 3 );
+		add_filter( 'woocommerce_get_item_data',                   [ $this, 'display_plan_in_cart' ], 10, 2 );
+		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'save_plan_to_order' ], 10, 4 );
 	}
 
 	public function add_tab( array $tabs ): array {
@@ -28,11 +28,17 @@ class IremboPay_Subscription_Product {
 
 	public function render_panel(): void {
 		global $post;
-		$id       = $post->ID;
-		$is_sub   = get_post_meta( $id, '_irembopay_is_subscription', true );
-		$period   = get_post_meta( $id, '_irembopay_sub_period',      true ) ?: 'month';
-		$interval = get_post_meta( $id, '_irembopay_sub_interval',    true ) ?: '1';
-		$grace    = get_post_meta( $id, '_irembopay_sub_grace',       true ) ?: '3';
+		$id      = $post->ID;
+		$is_sub  = get_post_meta( $id, '_irembopay_is_subscription', true );
+		$plans   = class_exists( 'IremboPay_Subscription_Plans_DB' ) ? IremboPay_Subscription_Plans_DB::get_by_product( $id ) : [];
+		$plan_map = [];
+		foreach ( $plans as $p ) { $plan_map[ (int) $p->plan_number ] = $p; }
+
+		$units = [
+			'day'   => __( 'Day(s)',   'wc-irembopay' ),
+			'week'  => __( 'Week(s)',  'wc-irembopay' ),
+			'month' => __( 'Month(s)', 'wc-irembopay' ),
+		];
 		?>
 		<div id="irembopay_subscription_data" class="panel woocommerce_options_panel">
 			<div class="options_group">
@@ -44,83 +50,82 @@ class IremboPay_Subscription_Product {
 				] ); ?>
 			</div>
 			<div class="options_group irembopay-sub-fields" <?php echo $is_sub !== 'yes' ? 'style="display:none"' : ''; ?>>
-				<p class="form-field">
-					<label><?php esc_html_e( 'Billing Cycle', 'wc-irembopay' ); ?></label>
-					<span style="margin-left:8px"><?php esc_html_e( 'Every', 'wc-irembopay' ); ?></span>
-					<input type="number" name="_irembopay_sub_interval" value="<?php echo esc_attr( $interval ); ?>" min="1" max="365" style="width:60px">
-					<select name="_irembopay_sub_period">
-						<?php foreach ( [ 'day' => __( 'Day(s)', 'wc-irembopay' ), 'week' => __( 'Week(s)', 'wc-irembopay' ), 'month' => __( 'Month(s)', 'wc-irembopay' ), 'year' => __( 'Year(s)', 'wc-irembopay' ) ] as $val => $label ) : ?>
-							<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $period, $val ); ?>><?php echo esc_html( $label ); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</p>
-				<?php woocommerce_wp_text_input( [
-					'id'                => '_irembopay_sub_grace',
-					'label'             => __( 'Grace Period (days)', 'wc-irembopay' ),
-					'description'       => __( 'Days to wait for payment before suspending access.', 'wc-irembopay' ),
-					'desc_tip'          => true,
-					'type'              => 'number',
-					'custom_attributes' => [ 'min' => '0', 'max' => '30' ],
-					'value'             => $grace,
-				] ); ?>
-			</div>
-			<?php
-			$allow_inst    = get_post_meta( $id, '_irembopay_allow_installments', true );
-			$inst_options  = get_post_meta( $id, '_irembopay_installment_options', true );
-			$inst_options  = is_array( $inst_options ) ? $inst_options : [];
-			?>
-			<div class="options_group irembopay-sub-fields" <?php echo $is_sub !== 'yes' ? 'style="display:none"' : ''; ?>>
-				<?php woocommerce_wp_checkbox( [
-					'id'          => '_irembopay_allow_installments',
-					'label'       => __( 'Allow Installments', 'wc-irembopay' ),
-					'description' => __( 'Let customers split this payment into multiple installments.', 'wc-irembopay' ),
-					'value'       => $allow_inst,
-				] ); ?>
-				<?php if ( $allow_inst !== 'yes' ) : ?>
-				<div class="form-field irembopay-inst-options" style="padding-left:162px; margin-bottom:10px; display:none;">
-				<?php else : ?>
-				<div class="form-field irembopay-inst-options" style="padding-left:162px; margin-bottom:10px;">
-				<?php endif; ?>
-					<label style="display:block; margin-bottom:8px; font-weight:600;"><?php esc_html_e( 'Installment Options', 'wc-irembopay' ); ?></label>
-					<div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:4px;">
-					<?php foreach ( [ 1, 2, 3, 4, 6 ] as $n ) :
-						$checked = in_array( (string) $n, $inst_options, true ) || in_array( $n, $inst_options, true );
-					?>
-						<label style="
-							display:flex !important;
-							align-items:center !important;
-							gap:8px !important;
-							font-size:15px !important;
-							font-weight:600 !important;
-							cursor:pointer !important;
-							background:#f0f0f1;
-							border:1px solid #c3c4c7;
-							border-radius:4px;
-							padding:8px 16px !important;
-							min-width:60px;
-							justify-content:center;
-						">
-							<input type="checkbox"
-							       name="_irembopay_installment_options[]"
-							       value="<?php echo esc_attr( $n ); ?>"
-							       style="
-							           width:18px !important;
-							           height:18px !important;
-							           margin:0 !important;
-							           cursor:pointer !important;
-							       "
-							       <?php checked( $checked ); ?>>
-							<span style="font-size:15px !important;"><?php echo esc_html( $n ); ?>x</span>
-						</label>
-					<?php endforeach; ?>
-					</div>
+				<?php for ( $n = 1; $n <= 3; $n++ ) :
+					$p       = $plan_map[ $n ] ?? null;
+					$hidden  = ( $n === 3 && ! $p );
+				?>
+				<div class="irembopay-plan-block" id="irembopay-plan-block-<?php echo $n; ?>"
+				     <?php echo $hidden ? 'style="display:none"' : ''; ?>>
+					<p style="border-top:1px solid #ddd;margin:16px 0 12px;padding-top:12px;font-weight:600;color:#444">
+						<?php printf( esc_html__( '— Plan %d —', 'wc-irembopay' ), $n ); ?>
+						<?php if ( $n >= 2 ) : ?>
+							<a href="#" class="irembopay-remove-plan" data-plan="<?php echo $n; ?>"
+							   style="color:#cc0000;margin-left:12px;font-size:12px;text-decoration:none">
+								<?php esc_html_e( '✕ Remove', 'wc-irembopay' ); ?>
+							</a>
+						<?php endif; ?>
+					</p>
+					<p class="form-field">
+						<label><?php esc_html_e( 'Plan Name', 'wc-irembopay' ); ?></label>
+						<input type="text" name="_irembopay_plan[<?php echo $n; ?>][name]"
+						       value="<?php echo esc_attr( $p->plan_name ?? '' ); ?>"
+						       placeholder="<?php esc_attr_e( 'e.g. Monthly', 'wc-irembopay' ); ?>"
+						       style="width:60%">
+					</p>
+					<p class="form-field">
+						<label><?php esc_html_e( 'Price (Rwf)', 'wc-irembopay' ); ?></label>
+						<input type="number" name="_irembopay_plan[<?php echo $n; ?>][price]"
+						       value="<?php echo esc_attr( $p->price ?? '' ); ?>"
+						       min="0" step="1" style="width:120px">
+					</p>
+					<p class="form-field">
+						<label><?php esc_html_e( 'Bill every', 'wc-irembopay' ); ?></label>
+						<input type="number" name="_irembopay_plan[<?php echo $n; ?>][interval_value]"
+						       value="<?php echo esc_attr( $p->interval_value ?? 1 ); ?>"
+						       min="1" max="365" style="width:60px">
+						<select name="_irembopay_plan[<?php echo $n; ?>][interval_unit]">
+							<?php foreach ( $units as $val => $label ) : ?>
+								<option value="<?php echo esc_attr( $val ); ?>"
+								        <?php selected( $p->interval_unit ?? 'month', $val ); ?>>
+									<?php echo esc_html( $label ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+					</p>
+					<p class="form-field">
+						<label><?php esc_html_e( 'Total duration', 'wc-irembopay' ); ?></label>
+						<input type="number" name="_irembopay_plan[<?php echo $n; ?>][total_duration_value]"
+						       value="<?php echo esc_attr( $p->total_duration_value ?? 12 ); ?>"
+						       min="1" max="999" style="width:60px">
+						<select name="_irembopay_plan[<?php echo $n; ?>][total_duration_unit]">
+							<?php foreach ( $units as $val => $label ) : ?>
+								<option value="<?php echo esc_attr( $val ); ?>"
+								        <?php selected( $p->total_duration_unit ?? 'month', $val ); ?>>
+									<?php echo esc_html( $label ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+					</p>
+					<p class="form-field">
+						<label><?php esc_html_e( 'Grace Period (days)', 'wc-irembopay' ); ?></label>
+						<input type="number" name="_irembopay_plan[<?php echo $n; ?>][grace_period]"
+						       value="<?php echo esc_attr( $p->grace_period_days ?? 3 ); ?>"
+						       min="0" max="30" style="width:60px">
+					</p>
 				</div>
+				<?php endfor; ?>
+
+				<p id="irembopay-add-plan-3" style="padding:0 12px 12px;<?php echo isset( $plan_map[3] ) ? 'display:none' : ''; ?>">
+					<a href="#" class="button irembopay-add-plan" data-plan="3">
+						<?php esc_html_e( '+ Add Plan 3', 'wc-irembopay' ); ?>
+					</a>
+				</p>
 			</div>
 			<div class="options_group">
 				<?php woocommerce_wp_text_input( [
 					'id'          => '_irembopay_product_code',
 					'label'       => __( 'IremboPay Product Code', 'wc-irembopay' ),
-					'description' => __( 'The IremboPay product code for this product (e.g. PC-02f0b15ac4). Overrides the default product code in gateway settings. Required if selling this product via IremboPay.', 'wc-irembopay' ),
+					'description' => __( 'The IremboPay product code for this product (e.g. PC-02f0b15ac4). Overrides the default product code in gateway settings.', 'wc-irembopay' ),
 					'desc_tip'    => true,
 					'value'       => get_post_meta( $id, '_irembopay_product_code', true ),
 					'placeholder' => 'PC-xxxxxxxx',
@@ -128,86 +133,139 @@ class IremboPay_Subscription_Product {
 			</div>
 		</div>
 		<script>jQuery(function($){
-		$('#_irembopay_is_subscription').on('change', function(){ $('.irembopay-sub-fields').toggle(this.checked); });
-		$('#_irembopay_allow_installments').on('change', function(){ $('.irembopay-inst-options').toggle(this.checked); });
-	});</script>
+			$('#_irembopay_is_subscription').on('change', function(){ $('.irembopay-sub-fields').toggle(this.checked); });
+			$('.irembopay-add-plan').on('click', function(e){
+				e.preventDefault();
+				var n = $(this).data('plan');
+				$('#irembopay-plan-block-' + n).show();
+				$('#irembopay-add-plan-' + n).hide();
+			});
+			$(document).on('click', '.irembopay-remove-plan', function(e){
+				e.preventDefault();
+				var n = $(this).data('plan');
+				$('#irembopay-plan-block-' + n).hide();
+				$('#irembopay-plan-block-' + n + ' input[type=text], #irembopay-plan-block-' + n + ' input[type=number]').val('');
+				$('#irembopay-add-plan-' + n).show();
+			});
+		});</script>
 		<?php
 	}
 
 	public function save_fields( int $product_id ): void {
-		update_post_meta( $product_id, '_irembopay_is_subscription',  isset( $_POST['_irembopay_is_subscription'] ) ? 'yes' : 'no' );
-		update_post_meta( $product_id, '_irembopay_sub_period',        sanitize_text_field( $_POST['_irembopay_sub_period']       ?? 'month' ) );
-		update_post_meta( $product_id, '_irembopay_sub_interval',      max( 1, absint( $_POST['_irembopay_sub_interval']          ?? 1 ) ) );
-		update_post_meta( $product_id, '_irembopay_sub_grace',         max( 0, absint( $_POST['_irembopay_sub_grace']             ?? 3 ) ) );
+		update_post_meta( $product_id, '_irembopay_is_subscription', isset( $_POST['_irembopay_is_subscription'] ) ? 'yes' : 'no' );
 		update_post_meta( $product_id, '_irembopay_product_code', sanitize_text_field( $_POST['_irembopay_product_code'] ?? '' ) );
 
-		update_post_meta( $product_id, '_irembopay_allow_installments', isset( $_POST['_irembopay_allow_installments'] ) ? 'yes' : 'no' );
-		$raw_opts = isset( $_POST['_irembopay_installment_options'] ) ? (array) $_POST['_irembopay_installment_options'] : [];
-		$valid    = array_values( array_intersect( array_map( 'intval', $raw_opts ), [ 1, 2, 3, 4, 6 ] ) );
-		update_post_meta( $product_id, '_irembopay_installment_options', $valid );
+		$raw_plans   = isset( $_POST['_irembopay_plan'] ) ? (array) $_POST['_irembopay_plan'] : [];
+		$valid_units = [ 'day', 'week', 'month' ];
+		$plans       = [];
+
+		foreach ( [ 1, 2, 3 ] as $n ) {
+			$p     = $raw_plans[ $n ] ?? [];
+			$name  = sanitize_text_field( $p['name'] ?? '' );
+			$price = (float) ( $p['price'] ?? 0 );
+			if ( empty( $name ) || $price <= 0 ) { continue; }
+
+			$int_unit  = in_array( $p['interval_unit'] ?? '', $valid_units, true ) ? $p['interval_unit'] : 'month';
+			$dur_unit  = in_array( $p['total_duration_unit'] ?? '', $valid_units, true ) ? $p['total_duration_unit'] : 'month';
+
+			$plans[] = [
+				'plan_number'          => $n,
+				'plan_name'            => $name,
+				'price'                => $price,
+				'interval_value'       => max( 1, absint( $p['interval_value'] ?? 1 ) ),
+				'interval_unit'        => $int_unit,
+				'total_duration_value' => max( 1, absint( $p['total_duration_value'] ?? 12 ) ),
+				'total_duration_unit'  => $dur_unit,
+				'grace_period_days'    => max( 0, absint( $p['grace_period'] ?? 3 ) ),
+			];
+		}
+
+		IremboPay_Subscription_Plans_DB::save_plans_for_product( $product_id, $plans );
+		update_post_meta( $product_id, '_irembopay_plans', $plans );
 	}
 
-	public function render_installment_dropdown(): void {
+	public function render_plan_selector(): void {
 		global $product;
-		if ( ! $product || 'yes' !== get_post_meta( $product->get_id(), '_irembopay_allow_installments', true ) ) { return; }
-		$options = get_post_meta( $product->get_id(), '_irembopay_installment_options', true );
-		if ( empty( $options ) || ! is_array( $options ) ) { return; }
-		$options = array_unique( array_map( 'intval', $options ) );
-		sort( $options );
-		if ( ! in_array( 1, $options, true ) ) { array_unshift( $options, 1 ); }
-		$price = (float) $product->get_price();
+		if ( ! $product || 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return; }
+		$plans = IremboPay_Subscription_Plans_DB::get_by_product( $product->get_id() );
+		if ( empty( $plans ) ) { return; }
+
+		$unit_singular = [
+			'day'   => __( 'day',   'wc-irembopay' ),
+			'week'  => __( 'week',  'wc-irembopay' ),
+			'month' => __( 'month', 'wc-irembopay' ),
+		];
+		$unit_plural = [
+			'day'   => __( 'days',   'wc-irembopay' ),
+			'week'  => __( 'weeks',  'wc-irembopay' ),
+			'month' => __( 'months', 'wc-irembopay' ),
+		];
 		?>
-		<div class="irembopay-installment-selector" style="margin-bottom:1.2em;">
-			<label for="irembopay_installments" style="font-weight:bold;display:block;margin-bottom:.4em;">
-				<?php esc_html_e( 'Pay in:', 'wc-irembopay' ); ?>
-			</label>
-			<select name="irembopay_installments" id="irembopay_installments" style="min-width:260px">
-				<?php foreach ( $options as $n ) :
-					$per   = $n > 0 ? (int) round( $price / $n, 0 ) : (int) $price;
-					$label = $n === 1
-						? sprintf( __( '1 installment — %s today', 'wc-irembopay' ), strip_tags( wc_price( $per ) ) )
-						: sprintf( __( '%d installments — %s per installment', 'wc-irembopay' ), $n, strip_tags( wc_price( $per ) ) );
-				?>
-					<option value="<?php echo esc_attr( $n ); ?>"><?php echo esc_html( $label ); ?></option>
-				<?php endforeach; ?>
-			</select>
+		<div class="irembopay-plan-selector" style="margin-bottom:1.4em">
+			<p style="font-weight:bold;margin-bottom:.6em"><?php esc_html_e( 'Choose your plan:', 'wc-irembopay' ); ?></p>
+			<?php foreach ( $plans as $i => $plan ) :
+				$int_unit  = (int) $plan->interval_value === 1
+					? ( $unit_singular[ $plan->interval_unit ] ?? $plan->interval_unit )
+					: $plan->interval_value . ' ' . ( $unit_plural[ $plan->interval_unit ] ?? $plan->interval_unit );
+				$dur_label = $plan->total_duration_value . ' ' . ( (int) $plan->total_duration_value === 1
+					? ( $unit_singular[ $plan->total_duration_unit ] ?? $plan->total_duration_unit )
+					: ( $unit_plural[ $plan->total_duration_unit ] ?? $plan->total_duration_unit ) );
+			?>
+				<label style="display:block;margin-bottom:.5em;cursor:pointer;padding:8px 12px;border:1px solid #ddd;border-radius:4px">
+					<input type="radio" name="irembopay_plan_id"
+					       value="<?php echo esc_attr( $plan->id ); ?>"
+					       <?php echo $i === 0 ? 'checked' : ''; ?>>
+					<strong><?php echo esc_html( $plan->plan_name ); ?></strong>
+					— <?php echo wc_price( $plan->price ); ?>/<?php echo esc_html( $int_unit ); ?>
+					<span style="color:#666;font-size:.88em">
+						(<?php printf( esc_html__( '%s total', 'wc-irembopay' ), esc_html( $dur_label ) ); ?>)
+					</span>
+				</label>
+			<?php endforeach; ?>
 		</div>
 		<?php
 	}
 
-	public function add_installment_to_cart_item( array $cart_item_data, int $product_id, int $variation_id ): array {
-		if ( 'yes' !== get_post_meta( $product_id, '_irembopay_allow_installments', true ) ) { return $cart_item_data; }
-		$n = absint( $_POST['irembopay_installments'] ?? 1 );
-		if ( $n > 1 ) {
-			$cart_item_data['irembopay_installments'] = $n;
-		}
+	public function add_plan_to_cart_item( array $cart_item_data, int $product_id, int $variation_id ): array {
+		if ( 'yes' !== get_post_meta( $product_id, '_irembopay_is_subscription', true ) ) { return $cart_item_data; }
+		$plan_id = absint( $_POST['irembopay_plan_id'] ?? 0 );
+		if ( ! $plan_id ) { return $cart_item_data; }
+		$plan = IremboPay_Subscription_Plans_DB::get( $plan_id );
+		if ( ! $plan || (int) $plan->product_id !== $product_id ) { return $cart_item_data; }
+		$cart_item_data['irembopay_plan_id'] = $plan_id;
 		return $cart_item_data;
 	}
 
-	public function display_installment_in_cart( array $item_data, array $cart_item ): array {
-		if ( ! empty( $cart_item['irembopay_installments'] ) ) {
-			$n           = (int) $cart_item['irembopay_installments'];
+	public function display_plan_in_cart( array $item_data, array $cart_item ): array {
+		if ( empty( $cart_item['irembopay_plan_id'] ) ) { return $item_data; }
+		$plan = IremboPay_Subscription_Plans_DB::get( (int) $cart_item['irembopay_plan_id'] );
+		if ( $plan ) {
 			$item_data[] = [
-				'key'   => __( 'Payment plan', 'wc-irembopay' ),
-				'value' => sprintf( _n( '%d installment', '%d installments', $n, 'wc-irembopay' ), $n ),
+				'key'   => __( 'Plan', 'wc-irembopay' ),
+				'value' => esc_html( $plan->plan_name ),
 			];
 		}
 		return $item_data;
 	}
 
-	public function save_installment_to_order( \WC_Order_Item_Product $item, string $cart_item_key, array $cart_item_values, \WC_Order $order ): void {
-		if ( ! empty( $cart_item_values['irembopay_installments'] ) ) {
-			$n = (int) $cart_item_values['irembopay_installments'];
-			$item->add_meta_data( '_irembopay_chosen_installments', $n, true );
-			$order->update_meta_data( '_irembopay_chosen_installments', $n );
-		}
+	public function save_plan_to_order( \WC_Order_Item_Product $item, string $cart_item_key, array $cart_item_values, \WC_Order $order ): void {
+		if ( empty( $cart_item_values['irembopay_plan_id'] ) ) { return; }
+		$plan_id = (int) $cart_item_values['irembopay_plan_id'];
+		$item->add_meta_data( '_irembopay_chosen_plan_id', $plan_id, true );
+		$order->update_meta_data( '_irembopay_chosen_plan_id', $plan_id );
 	}
 
 	public function subscription_price_html( string $price, WC_Product $product ): string {
 		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return $price; }
-		$period   = get_post_meta( $product->get_id(), '_irembopay_sub_period',   true ) ?: 'month';
-		$interval = (int) get_post_meta( $product->get_id(), '_irembopay_sub_interval', true ) ?: 1;
-		return $price . ' <span class="irembopay-sub-period"> / ' . esc_html( IremboPay_Subscription_Manager::billing_label( $period, $interval ) ) . '</span>';
+		$plans = IremboPay_Subscription_Plans_DB::get_by_product( $product->get_id() );
+		if ( empty( $plans ) ) { return $price; }
+		$plan = $plans[0];
+		$unit_s = [ 'day' => __( 'day', 'wc-irembopay' ), 'week' => __( 'week', 'wc-irembopay' ), 'month' => __( 'month', 'wc-irembopay' ) ];
+		$unit_p = [ 'day' => __( 'days', 'wc-irembopay' ), 'week' => __( 'weeks', 'wc-irembopay' ), 'month' => __( 'months', 'wc-irembopay' ) ];
+		$unit   = (int) $plan->interval_value === 1
+			? ( $unit_s[ $plan->interval_unit ] ?? $plan->interval_unit )
+			: $plan->interval_value . ' ' . ( $unit_p[ $plan->interval_unit ] ?? $plan->interval_unit );
+		return wc_price( $plan->price ) . ' <span class="irembopay-sub-period">/ ' . esc_html( $unit ) . '</span>';
 	}
 
 	public function sold_individually( bool $sold, WC_Product $product ): bool {
