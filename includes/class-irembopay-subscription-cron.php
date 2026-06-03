@@ -8,14 +8,25 @@ class IremboPay_Subscription_Cron {
 	public function __construct() {
 		add_action( self::RENEWAL_HOOK, [ $this, 'run_renewals' ] );
 		add_action( self::EXPIRY_HOOK,  [ $this, 'run_expiry'   ] );
+		add_filter( 'cron_schedules', [ $this, 'add_schedules' ] );
+	}
+
+	public function add_schedules( array $schedules ): array {
+		if ( ! isset( $schedules['every5minutes'] ) ) {
+			$schedules['every5minutes'] = [
+				'interval' => 300,
+				'display'  => __( 'Every 5 Minutes (IremboPay Test)', 'wc-irembopay' ),
+			];
+		}
+		return $schedules;
 	}
 
 	public static function schedule(): void {
 		if ( ! wp_next_scheduled( self::RENEWAL_HOOK ) ) {
-			wp_schedule_event( strtotime( 'tomorrow midnight' ), 'daily', self::RENEWAL_HOOK );
+			wp_schedule_event( time() + 300, 'every5minutes', self::RENEWAL_HOOK );
 		}
 		if ( ! wp_next_scheduled( self::EXPIRY_HOOK ) ) {
-			wp_schedule_event( time() + 300, 'twicedaily', self::EXPIRY_HOOK );
+			wp_schedule_event( time() + 300, 'every5minutes', self::EXPIRY_HOOK );
 		}
 	}
 

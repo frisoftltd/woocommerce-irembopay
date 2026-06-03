@@ -142,6 +142,14 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.0
+- New: Expiry email sent to student when subscription expires — includes a "Restore Access — Pay Now" button with a fresh invoice link
+- New: Parent WhatsApp contact field on every subscription row in the admin table
+- New: WhatsApp message link auto-generated on renewal and expiry — click to open WhatsApp with message pre-written, then send manually
+- New: 5-minute cron interval registered for testing renewal and expiry flows quickly
+- Fix: Subscription expiry was previously silent — no student or parent notification was sent
+- DB: `parent_whatsapp` column added to `wp_irembopay_subscriptions` table with auto-migration for existing installs
+
 ### v2.5.1
 - Fix: Regular price field no longer hidden for subscription products
 - Fix: Subscription price now displays correctly on course listing

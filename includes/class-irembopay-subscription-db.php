@@ -30,6 +30,7 @@ class IremboPay_Subscription_DB {
 			grace_period_days TINYINT(3)  UNSIGNED NOT NULL DEFAULT 3,
 			last_invoice     VARCHAR(120) DEFAULT NULL,
 			renewal_order_id BIGINT(20)   UNSIGNED DEFAULT NULL,
+			parent_whatsapp  VARCHAR(30)  DEFAULT NULL,
 			created_at       DATETIME     NOT NULL,
 			updated_at       DATETIME     NOT NULL,
 			PRIMARY KEY  (id),
@@ -39,7 +40,12 @@ class IremboPay_Subscription_DB {
 		) {$charset};";
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
-		update_option( 'irembopay_subscription_db_version', '1.0' );
+		// Migrate existing installs: add parent_whatsapp if not present
+		$col = $wpdb->get_results( "SHOW COLUMNS FROM {$table} LIKE 'parent_whatsapp'" );
+		if ( empty( $col ) ) {
+		    $wpdb->query( "ALTER TABLE {$table} ADD COLUMN parent_whatsapp VARCHAR(30) DEFAULT NULL AFTER renewal_order_id" );
+		}
+		update_option( 'irembopay_subscription_db_version', '1.1' );
 	}
 
 	public static function insert( array $data ) {

@@ -166,6 +166,7 @@ class IremboPay_Subscription_Manager {
 		foreach ( IremboPay_Subscription_DB::get_expired_grace() as $sub ) {
 			IremboPay_Subscription_DB::update( $sub->id, [ 'status' => self::STATUS_EXPIRED ] );
 			IremboPay_Logger::info( "Subscription #{$sub->id} expired (grace period passed)." );
+			self::send_expiry_notification( $sub );
 			do_action( 'irembopay_subscription_expired', $sub->id );
 		}
 	}
@@ -187,6 +188,108 @@ class IremboPay_Subscription_Manager {
 			default:     $ts = strtotime( "+{$interval} month", $ts ); break;
 		}
 		return date( 'Y-m-d H:i:s', $ts );
+	}
+
+	public static function build_whatsapp_link( string $phone, string $message ): string {
+		$digits = preg_replace( '/\D/', '', $phone );
+		// Convert Rwanda local format 07x → 2507x
+		if ( strlen( $digits ) === 10 && str_starts_with( $digits, '0' ) ) {
+			$digits = '250' . ltrim( $digits, '0' );
+		}
+		return 'https://wa.me/' . $digits . '?text=' . rawurlencode( $message );
+	}
+
+	public static function send_expiry_notification( object $sub ): void {
+		$user = get_userdata( $sub->user_id );
+		if ( ! $user ) { return; }
+
+		$site_name     = get_bloginfo( 'name' );
+		$product_name  = get_the_title( $sub->product_id ) ?: __( 'your course subscription', 'wc-irembopay' );
+		$amount        = wc_price( $sub->amount, [ 'currency' => $sub->currency ] );
+		$customer_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+
+		// Create a renewal order and a fresh invoice so there is a real pay link
+		$renewal_order  = self::create_renewal_order( $sub );
+		$pay_url        = '';
+		$invoice_number = '';
+
+		if ( $renewal_order ) {
+			$settings           = get_option( 'woocommerce_irembopay_settings', [] );
+			$secret_key         = $settings['secret_key']         ?? '';
+			$payment_identifier = $settings['payment_identifier'] ?? '';
+
+			if ( ! empty( $secret_key ) ) {
+				$product_code  = get_post_meta( $sub->product_id, '_irembopay_product_code', true ) ?: ( $settings['product_code'] ?? '' );
+				$payment_items = [ array_filter( [ 'unitAmount' => (int) round( $sub->amount ), 'quantity' => 1, 'code' => $product_code ?: null ] ) ];
+				$expiry_hours  = (int) ( $settings['invoice_expiry_hours'] ?? 24 );
+				$expiry_at     = ( new DateTime( 'now', new DateTimeZone( wp_timezone_string() ) ) )
+				                     ->modify( "+{$expiry_hours} hours" )
+				                     ->format( DateTime::ATOM );
+
+				$invoice_data = [
+					'transactionId'            => sprintf( 'WC-EXP-%d-%s', $renewal_order->get_id(), wp_generate_password( 8, false ) ),
+					'paymentAccountIdentifier' => $payment_identifier,
+					'customer'                 => [
+						'email'       => $user->user_email,
+						'phoneNumber' => get_user_meta( $user->ID, 'billing_phone', true ) ?: '',
+						'name'        => $customer_name,
+					],
+					'paymentItems' => $payment_items,
+					'description'  => sprintf( __( 'Subscription reactivation – %s', 'wc-irembopay' ), $product_name ),
+					'language'     => 'EN',
+					'expiryAt'     => $expiry_at,
+				];
+
+				$api      = new IremboPay_API( $secret_key );
+				$response = $api->create_invoice( $invoice_data );
+
+				if ( ! empty( $response['success'] ) && ! empty( $response['data']['invoiceNumber'] ) ) {
+					$invoice_number = $response['data']['invoiceNumber'];
+					$renewal_order->update_meta_data( '_irembopay_invoice_number', $invoice_number );
+					$renewal_order->update_meta_data( '_irembopay_subscription_id', $sub->id );
+					$renewal_order->update_status( 'pending', sprintf( __( 'IremboPay expiry reactivation invoice: %s', 'wc-irembopay' ), $invoice_number ) );
+					$renewal_order->save();
+
+					$pay_url = add_query_arg( [
+						'irembopay_payment' => '1',
+						'order_id'          => $renewal_order->get_id(),
+						'invoice_number'    => rawurlencode( $invoice_number ),
+						'key'               => $renewal_order->get_order_key(),
+					], home_url( '/' ) );
+
+					IremboPay_Subscription_DB::update( $sub->id, [
+						'last_invoice'     => $invoice_number,
+						'renewal_order_id' => $renewal_order->get_id(),
+					] );
+				}
+			}
+		}
+
+		// Send expiry email to student
+		$subject = sprintf( __( '[%s] Your course access has been suspended', 'wc-irembopay' ), $site_name );
+		$message = self::expiry_email_html( compact( 'customer_name', 'site_name', 'amount', 'pay_url', 'product_name', 'invoice_number' ) );
+		wp_mail( $user->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+		IremboPay_Logger::info( "Expiry email sent to {$user->user_email} for subscription #{$sub->id}." );
+
+		// Build WhatsApp link for parent and store it on the order note
+		$parent_whatsapp = $sub->parent_whatsapp ?? '';
+		if ( ! empty( $parent_whatsapp ) && ! empty( $pay_url ) ) {
+			$wa_message = sprintf(
+				"Hello! 👋\n\nYour child's subscription to *%s* on *%s* has expired and their course access has been suspended.\n\nTo restore access, please make the payment of %s using the link below:\n\n%s\n\nThank you! 🙏",
+				$product_name,
+				$site_name,
+				strip_tags( $amount ),
+				$pay_url
+			);
+			$wa_link = self::build_whatsapp_link( $parent_whatsapp, $wa_message );
+			IremboPay_Logger::info( "WhatsApp parent link for subscription #{$sub->id}: {$wa_link}" );
+			if ( $renewal_order ) {
+				$renewal_order->add_order_note(
+					sprintf( __( 'Parent WhatsApp notification link: %s', 'wc-irembopay' ), $wa_link )
+				);
+				$renewal_order->save();
+			}
+		}
 	}
 
 	public static function billing_label( string $period, int $interval ): string {
@@ -256,6 +359,25 @@ class IremboPay_Subscription_Manager {
 
 		wp_mail( $user->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
 		$renewal_order->add_order_note( sprintf( __( 'Renewal payment email sent to %s.', 'wc-irembopay' ), $user->user_email ) );
+
+		// Build WhatsApp link for parent and attach to order note
+		$parent_whatsapp = $sub->parent_whatsapp ?? '';
+		if ( ! empty( $parent_whatsapp ) ) {
+			$wa_message = sprintf(
+				"Hello! 👋\n\nYour child's subscription to *%s* on *%s* is due for renewal.\n\nAmount: %s\n\nPlease use the link below to pay and keep access active:\n\n%s\n\nAccess will be suspended in %d day(s) if unpaid. Thank you! 🙏",
+				$product_name,
+				$site_name,
+				strip_tags( $amount ),
+				$pay_url,
+				$grace_days
+			);
+			$wa_link = self::build_whatsapp_link( $parent_whatsapp, $wa_message );
+			$renewal_order->add_order_note(
+				sprintf( __( 'Parent WhatsApp notification link: %s', 'wc-irembopay' ), $wa_link )
+			);
+			$renewal_order->save();
+			IremboPay_Logger::info( "WhatsApp parent link for renewal #{$sub->id}: {$wa_link}" );
+		}
 	}
 
 	private static function renewal_email_html( array $d ): string {
@@ -283,6 +405,47 @@ body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
 <p style="font-size:.88em;color:#666"><?php esc_html_e( "If the button doesn't work:", 'wc-irembopay' ); ?><br>
 <a href="<?php echo esc_url( $d['pay_url'] ); ?>"><?php echo esc_url( $d['pay_url'] ); ?></a></p>
 <div class="meta"><?php printf( esc_html__( 'Invoice: %s', 'wc-irembopay' ), esc_html( $d['invoice_number'] ) ); ?></div>
+</div>
+<div class="foot">&copy; <?php echo date('Y'); ?> <?php echo esc_html( $d['site_name'] ); ?></div>
+</div></body></html>
+<?php return ob_get_clean();
+	}
+
+	private static function expiry_email_html( array $d ): string {
+		ob_start(); ?>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
+.w{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.h{background:#dc2626;color:#fff;padding:28px 32px}.h h1{margin:0;font-size:22px}
+.b{padding:32px;color:#333;line-height:1.7}
+.box{background:#fef2f2;border-left:4px solid #dc2626;padding:16px 20px;border-radius:4px;margin:20px 0}
+.box strong{font-size:1.35em;color:#b91c1c}
+.btn{display:inline-block;background:#16a34a;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;font-size:16px;margin:20px 0}
+.info{background:#f0fdf4;border-left:4px solid #16a34a;padding:12px 16px;border-radius:4px;font-size:.9em;color:#166534;margin-top:16px}
+.meta{font-size:.82em;color:#999;border-top:1px solid #eee;padding-top:14px;margin-top:20px}
+.foot{background:#f9f9f9;padding:14px 32px;font-size:12px;color:#aaa;text-align:center}
+</style></head><body>
+<div class="w">
+<div class="h"><h1><?php echo esc_html( $d['site_name'] ); ?></h1></div>
+<div class="b">
+<p><?php printf( esc_html__( 'Hello %s,', 'wc-irembopay' ), esc_html( $d['customer_name'] ) ); ?></p>
+<div class="box">
+<strong>⚠️ <?php esc_html_e( 'Your course access has been suspended', 'wc-irembopay' ); ?></strong><br>
+<?php printf( esc_html__( 'Your subscription to %s has expired because the renewal payment was not received in time.', 'wc-irembopay' ), '<strong>' . esc_html( $d['product_name'] ) . '</strong>' ); ?>
+</div>
+<?php if ( ! empty( $d['pay_url'] ) ) : ?>
+<p><?php esc_html_e( 'You can restore access immediately by completing your payment:', 'wc-irembopay' ); ?></p>
+<p><?php esc_html_e( 'Amount:', 'wc-irembopay' ); ?> <strong><?php echo $d['amount']; ?></strong></p>
+<a href="<?php echo esc_url( $d['pay_url'] ); ?>" class="btn">🔓 <?php esc_html_e( 'Restore Access — Pay Now', 'wc-irembopay' ); ?></a>
+<div class="info">✅ <?php esc_html_e( 'Your access will be restored automatically as soon as payment is confirmed.', 'wc-irembopay' ); ?></div>
+<p style="font-size:.88em;color:#666;margin-top:16px"><?php esc_html_e( "If the button doesn't work:", 'wc-irembopay' ); ?><br>
+<a href="<?php echo esc_url( $d['pay_url'] ); ?>"><?php echo esc_url( $d['pay_url'] ); ?></a></p>
+<?php if ( ! empty( $d['invoice_number'] ) ) : ?>
+<div class="meta"><?php printf( esc_html__( 'Invoice: %s', 'wc-irembopay' ), esc_html( $d['invoice_number'] ) ); ?></div>
+<?php endif; ?>
+<?php else : ?>
+<p><?php esc_html_e( 'Please contact us to restore your access.', 'wc-irembopay' ); ?></p>
+<?php endif; ?>
 </div>
 <div class="foot">&copy; <?php echo date('Y'); ?> <?php echo esc_html( $d['site_name'] ); ?></div>
 </div></body></html>
