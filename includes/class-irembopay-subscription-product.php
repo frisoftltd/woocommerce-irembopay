@@ -32,9 +32,10 @@ class IremboPay_Subscription_Product {
 		if ( $grace === '' || $grace === false ) { $grace = 3; }
 
 		$units = [
-			'day'   => __( 'Day(s)',   'wc-irembopay' ),
-			'week'  => __( 'Week(s)',  'wc-irembopay' ),
-			'month' => __( 'Month(s)', 'wc-irembopay' ),
+			'minute' => __( 'Minute(s) — ⚠️ Testing only', 'wc-irembopay' ),
+			'day'    => __( 'Day(s)',   'wc-irembopay' ),
+			'week'   => __( 'Week(s)',  'wc-irembopay' ),
+			'month'  => __( 'Month(s)', 'wc-irembopay' ),
 		];
 		?>
 		<div id="irembopay_subscription_data" class="panel woocommerce_options_panel">
@@ -97,7 +98,7 @@ class IremboPay_Subscription_Product {
 
 		update_post_meta( $product_id, '_irembopay_is_subscription', isset( $_POST['_irembopay_is_subscription'] ) ? 'yes' : 'no' );
 
-		$valid_units = [ 'day', 'week', 'month' ];
+		$valid_units = [ 'minute', 'day', 'week', 'month' ];
 		$cy_value    = max( 1, absint( $_POST['_irembopay_billing_cycle_value'] ?? 1 ) );
 		$cy_unit     = in_array( $_POST['_irembopay_billing_cycle_unit'] ?? '', $valid_units, true )
 		               ? $_POST['_irembopay_billing_cycle_unit']

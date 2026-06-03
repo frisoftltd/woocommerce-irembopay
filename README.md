@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.2
+- New: "Minute(s)" billing period added to product subscription settings for testing renewal and expiry flows quickly (e.g. set "Bill every 10 Minutes" on a test product)
+
 ### v2.6.1
 - Fix: Parent WhatsApp number now read automatically from the student's user profile (Parent/Guardian Phone field) — no manual entry needed
 - Fix: Renewal and expiry notification emails now sent to parent email address from user profile, not student email

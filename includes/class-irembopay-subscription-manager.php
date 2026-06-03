@@ -182,10 +182,11 @@ class IremboPay_Subscription_Manager {
 	public static function calc_next_renewal( string $from, string $period, int $interval ): string {
 		$ts = strtotime( $from );
 		switch ( $period ) {
-			case 'day':  $ts = strtotime( "+{$interval} day",   $ts ); break;
-			case 'week': $ts = strtotime( "+{$interval} week",  $ts ); break;
-			case 'year': $ts = strtotime( "+{$interval} year",  $ts ); break;
-			default:     $ts = strtotime( "+{$interval} month", $ts ); break;
+			case 'minute': $ts = strtotime( "+{$interval} minute", $ts ); break;
+			case 'day':    $ts = strtotime( "+{$interval} day",    $ts ); break;
+			case 'week':   $ts = strtotime( "+{$interval} week",   $ts ); break;
+			case 'year':   $ts = strtotime( "+{$interval} year",   $ts ); break;
+			default:       $ts = strtotime( "+{$interval} month",  $ts ); break;
 		}
 		return date( 'Y-m-d H:i:s', $ts );
 	}
@@ -316,10 +317,11 @@ class IremboPay_Subscription_Manager {
 
 	public static function billing_label( string $period, int $interval ): string {
 		$map = [
-			'day'   => _n( 'every day',   'every %d days',   $interval, 'wc-irembopay' ),
-			'week'  => _n( 'every week',  'every %d weeks',  $interval, 'wc-irembopay' ),
-			'month' => _n( 'every month', 'every %d months', $interval, 'wc-irembopay' ),
-			'year'  => _n( 'every year',  'every %d years',  $interval, 'wc-irembopay' ),
+			'minute' => _n( 'every minute', 'every %d minutes', $interval, 'wc-irembopay' ),
+			'day'    => _n( 'every day',    'every %d days',    $interval, 'wc-irembopay' ),
+			'week'   => _n( 'every week',   'every %d weeks',   $interval, 'wc-irembopay' ),
+			'month'  => _n( 'every month',  'every %d months',  $interval, 'wc-irembopay' ),
+			'year'   => _n( 'every year',   'every %d years',   $interval, 'wc-irembopay' ),
 		];
 		return sprintf( $map[ $period ] ?? "every %d {$period}s", $interval );
 	}
