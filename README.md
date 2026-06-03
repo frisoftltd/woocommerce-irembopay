@@ -142,6 +142,12 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.1
+- Fix: Parent WhatsApp number now read automatically from the student's user profile (Parent/Guardian Phone field) — no manual entry needed
+- Fix: Renewal and expiry notification emails now sent to parent email address from user profile, not student email
+- Fix: WhatsApp send link now always visible in admin whenever a parent phone number exists on the profile — not only when an invoice is pending
+- Removed: Manual WhatsApp input field from subscription admin table (number comes from user profile automatically)
+
 ### v2.6.0
 - New: Expiry email sent to student when subscription expires — includes a "Restore Access — Pay Now" button with a fresh invoice link
 - New: Parent WhatsApp contact field on every subscription row in the admin table

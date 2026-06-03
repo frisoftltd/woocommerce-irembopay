@@ -199,6 +199,19 @@ class IremboPay_Subscription_Manager {
 		return 'https://wa.me/' . $digits . '?text=' . rawurlencode( $message );
 	}
 
+	private static function get_parent_contact( int $user_id ): array {
+		// Meta keys from the Parent / Guardian Information section of the user profile.
+		// To find the exact keys on your install, run:
+		//   wp user meta get <user_id> --all | grep -i "parent\|guardian\|phone"
+		// or query: SELECT meta_key, meta_value FROM wp_usermeta WHERE user_id = <id> AND meta_key LIKE '%parent%'
+		$phone = get_user_meta( $user_id, 'parent_phone', true );
+		$email = get_user_meta( $user_id, 'parent_email', true );
+		return [
+			'phone' => sanitize_text_field( $phone ?: '' ),
+			'email' => sanitize_email( $email ?: '' ),
+		];
+	}
+
 	public static function send_expiry_notification( object $sub ): void {
 		$user = get_userdata( $sub->user_id );
 		if ( ! $user ) { return; }
@@ -265,27 +278,36 @@ class IremboPay_Subscription_Manager {
 			}
 		}
 
-		// Send expiry email to student
-		$subject = sprintf( __( '[%s] Your course access has been suspended', 'wc-irembopay' ), $site_name );
-		$message = self::expiry_email_html( compact( 'customer_name', 'site_name', 'amount', 'pay_url', 'product_name', 'invoice_number' ) );
-		wp_mail( $user->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
-		IremboPay_Logger::info( "Expiry email sent to {$user->user_email} for subscription #{$sub->id}." );
+		// Get parent contact from user profile
+		$parent       = self::get_parent_contact( $sub->user_id );
+		$to_email     = ! empty( $parent['email'] ) ? $parent['email'] : $user->user_email;
+		$to_name      = ! empty( $parent['email'] ) ? __( 'Parent/Guardian', 'wc-irembopay' ) : $customer_name;
+		$parent_phone = ! empty( $parent['phone'] ) ? $parent['phone'] : ( $sub->parent_whatsapp ?? '' );
 
-		// Build WhatsApp link for parent and store it on the order note
-		$parent_whatsapp = $sub->parent_whatsapp ?? '';
-		if ( ! empty( $parent_whatsapp ) && ! empty( $pay_url ) ) {
+		// Send expiry email to parent (or student if no parent email)
+		$subject = sprintf( __( '[%s] Course access suspended — payment required', 'wc-irembopay' ), $site_name );
+		$message = self::expiry_email_html( array_merge(
+			compact( 'customer_name', 'site_name', 'amount', 'pay_url', 'product_name', 'invoice_number' ),
+			[ 'recipient_name' => $to_name ]
+		) );
+		wp_mail( $to_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+		IremboPay_Logger::info( "Expiry email sent to {$to_email} for subscription #{$sub->id}." );
+
+		// Build WhatsApp link for parent
+		if ( ! empty( $parent_phone ) && ! empty( $pay_url ) ) {
 			$wa_message = sprintf(
-				"Hello! 👋\n\nYour child's subscription to *%s* on *%s* has expired and their course access has been suspended.\n\nTo restore access, please make the payment of %s using the link below:\n\n%s\n\nThank you! 🙏",
+				"Hello! 👋\n\nYour child *%s*'s subscription to *%s* on *%s* has expired and their course access has been suspended.\n\nTo restore access, please make the payment of %s using the link below:\n\n%s\n\nThank you! 🙏",
+				$customer_name,
 				$product_name,
 				$site_name,
 				strip_tags( $amount ),
 				$pay_url
 			);
-			$wa_link = self::build_whatsapp_link( $parent_whatsapp, $wa_message );
+			$wa_link = self::build_whatsapp_link( $parent_phone, $wa_message );
 			IremboPay_Logger::info( "WhatsApp parent link for subscription #{$sub->id}: {$wa_link}" );
 			if ( $renewal_order ) {
 				$renewal_order->add_order_note(
-					sprintf( __( 'Parent WhatsApp notification link: %s', 'wc-irembopay' ), $wa_link )
+					sprintf( __( 'Parent WhatsApp link: %s', 'wc-irembopay' ), $wa_link )
 				);
 				$renewal_order->save();
 			}
@@ -353,27 +375,39 @@ class IremboPay_Subscription_Manager {
 		$product_name  = get_the_title( $sub->product_id ) ?: __( 'course subscription', 'wc-irembopay' );
 		$customer_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
 		$grace_days    = (int) $sub->grace_period_days;
+		$parent        = self::get_parent_contact( $sub->user_id );
 
-		$subject = sprintf( __( '[%s] Action required: renew your course subscription', 'wc-irembopay' ), $site_name );
-		$message = self::renewal_email_html( compact( 'customer_name', 'site_name', 'amount', 'pay_url', 'product_name', 'invoice_number', 'grace_days' ) );
+		// Send to parent email if available, otherwise fall back to student email
+		$to_email = ! empty( $parent['email'] ) ? $parent['email'] : $user->user_email;
+		$to_name  = ! empty( $parent['email'] ) ? __( 'Parent/Guardian', 'wc-irembopay' ) : $customer_name;
 
-		wp_mail( $user->user_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
-		$renewal_order->add_order_note( sprintf( __( 'Renewal payment email sent to %s.', 'wc-irembopay' ), $user->user_email ) );
+		$subject = sprintf( __( '[%s] Action required: renew your child\'s course subscription', 'wc-irembopay' ), $site_name );
+		$message = self::renewal_email_html( array_merge(
+			compact( 'customer_name', 'site_name', 'amount', 'pay_url', 'product_name', 'invoice_number', 'grace_days' ),
+			[ 'recipient_name' => $to_name ]
+		) );
 
-		// Build WhatsApp link for parent and attach to order note
-		$parent_whatsapp = $sub->parent_whatsapp ?? '';
-		if ( ! empty( $parent_whatsapp ) ) {
+		wp_mail( $to_email, $subject, $message, [ 'Content-Type: text/html; charset=UTF-8' ] );
+		$renewal_order->add_order_note( sprintf(
+			__( 'Renewal payment email sent to %s.', 'wc-irembopay' ),
+			$to_email
+		) );
+
+		// WhatsApp link using parent phone from user profile
+		$parent_phone = ! empty( $parent['phone'] ) ? $parent['phone'] : ( $sub->parent_whatsapp ?? '' );
+		if ( ! empty( $parent_phone ) ) {
 			$wa_message = sprintf(
-				"Hello! 👋\n\nYour child's subscription to *%s* on *%s* is due for renewal.\n\nAmount: %s\n\nPlease use the link below to pay and keep access active:\n\n%s\n\nAccess will be suspended in %d day(s) if unpaid. Thank you! 🙏",
+				"Hello! 👋\n\nYour child *%s*'s subscription to *%s* on *%s* is due for renewal.\n\nAmount: %s\n\nPlease use the link below to pay and keep access active:\n\n%s\n\nAccess will be suspended in %d day(s) if unpaid. Thank you! 🙏",
+				$customer_name,
 				$product_name,
 				$site_name,
 				strip_tags( $amount ),
 				$pay_url,
 				$grace_days
 			);
-			$wa_link = self::build_whatsapp_link( $parent_whatsapp, $wa_message );
+			$wa_link = self::build_whatsapp_link( $parent_phone, $wa_message );
 			$renewal_order->add_order_note(
-				sprintf( __( 'Parent WhatsApp notification link: %s', 'wc-irembopay' ), $wa_link )
+				sprintf( __( 'Parent WhatsApp link: %s', 'wc-irembopay' ), $wa_link )
 			);
 			$renewal_order->save();
 			IremboPay_Logger::info( "WhatsApp parent link for renewal #{$sub->id}: {$wa_link}" );
@@ -397,7 +431,8 @@ body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
 <div class="w">
 <div class="h"><h1><?php echo esc_html( $d['site_name'] ); ?></h1></div>
 <div class="b">
-<p><?php printf( esc_html__( 'Hello %s,', 'wc-irembopay' ), esc_html( $d['customer_name'] ) ); ?></p>
+<p><?php printf( esc_html__( 'Hello %s,', 'wc-irembopay' ), esc_html( $d['recipient_name'] ?? $d['customer_name'] ) ); ?></p>
+<p style="color:#666;font-size:.9em"><?php printf( esc_html__( 'This is regarding %s\'s subscription.', 'wc-irembopay' ), esc_html( $d['customer_name'] ) ); ?></p>
 <p><?php printf( esc_html__( 'Your subscription to %s is due for renewal.', 'wc-irembopay' ), '<strong>' . esc_html( $d['product_name'] ) . '</strong>' ); ?></p>
 <div class="box"><?php esc_html_e( 'Amount due:', 'wc-irembopay' ); ?><br><strong><?php echo $d['amount']; ?></strong></div>
 <a href="<?php echo esc_url( $d['pay_url'] ); ?>" class="btn"><?php esc_html_e( 'Pay Now', 'wc-irembopay' ); ?></a>
@@ -428,7 +463,8 @@ body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
 <div class="w">
 <div class="h"><h1><?php echo esc_html( $d['site_name'] ); ?></h1></div>
 <div class="b">
-<p><?php printf( esc_html__( 'Hello %s,', 'wc-irembopay' ), esc_html( $d['customer_name'] ) ); ?></p>
+<p><?php printf( esc_html__( 'Hello %s,', 'wc-irembopay' ), esc_html( $d['recipient_name'] ?? $d['customer_name'] ) ); ?></p>
+<p style="color:#666;font-size:.9em"><?php printf( esc_html__( 'This is regarding %s\'s subscription.', 'wc-irembopay' ), esc_html( $d['customer_name'] ) ); ?></p>
 <div class="box">
 <strong>⚠️ <?php esc_html_e( 'Your course access has been suspended', 'wc-irembopay' ); ?></strong><br>
 <?php printf( esc_html__( 'Your subscription to %s has expired because the renewal payment was not received in time.', 'wc-irembopay' ), '<strong>' . esc_html( $d['product_name'] ) . '</strong>' ); ?>

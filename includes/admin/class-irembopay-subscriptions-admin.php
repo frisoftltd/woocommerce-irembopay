@@ -6,7 +6,6 @@ class IremboPay_Subscriptions_Admin {
 	public function __construct() {
 		add_action( 'admin_menu',  [ $this, 'add_menu' ] );
 		add_action( 'admin_post_irembopay_subscription_action', [ $this, 'handle_action' ] );
-		add_action( 'admin_post_irembopay_save_whatsapp', [ $this, 'handle_save_whatsapp' ] );
 		add_action( 'admin_notices', [ $this, 'admin_notice' ] );
 	}
 
@@ -140,13 +139,33 @@ class IremboPay_Subscriptions_Admin {
 	}
 
 	private function render_whatsapp_field( object $sub ): void {
-		$nonce   = wp_create_nonce( 'irembopay_wa_' . $sub->id );
-		$current = esc_attr( $sub->parent_whatsapp ?? '' );
-		$base    = admin_url( 'admin-post.php' );
+		$user = get_userdata( $sub->user_id );
+		if ( ! $user ) {
+			echo '<span style="color:#aaa;font-size:12px">—</span>';
+			return;
+		}
 
-		// Build send link if number + live invoice both exist
-		$wa_link = '';
-		if ( ! empty( $sub->parent_whatsapp ) && ! empty( $sub->last_invoice ) && ! empty( $sub->renewal_order_id ) ) {
+		// Read parent phone from user profile meta.
+		// Meta key 'parent_phone' comes from the Parent / Guardian Information profile section.
+		// If the key differs on your install, update it here and in get_parent_contact().
+		// To find the actual key: wp user meta get <id> --all | grep -i "parent\|guardian\|phone"
+		$parent_phone = get_user_meta( $sub->user_id, 'parent_phone', true );
+		$parent_phone = sanitize_text_field( $parent_phone ?: ( $sub->parent_whatsapp ?? '' ) );
+
+		if ( empty( $parent_phone ) ) {
+			echo '<span style="color:#aaa;font-size:11px">' . esc_html__( 'No parent phone', 'wc-irembopay' ) . '</span>';
+			return;
+		}
+
+		echo '<span style="font-size:12px;color:#333">' . esc_html( $parent_phone ) . '</span>';
+
+		$product_name  = get_the_title( $sub->product_id ) ?: 'course subscription';
+		$site_name     = get_bloginfo( 'name' );
+		$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
+		$customer_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+
+		// Use live invoice pay link if available, otherwise a generic reminder message
+		if ( ! empty( $sub->last_invoice ) && ! empty( $sub->renewal_order_id ) ) {
 			$renewal_order = wc_get_order( (int) $sub->renewal_order_id );
 			if ( $renewal_order ) {
 				$pay_url = add_query_arg( [
@@ -155,55 +174,28 @@ class IremboPay_Subscriptions_Admin {
 					'invoice_number'    => rawurlencode( $sub->last_invoice ),
 					'key'               => $renewal_order->get_order_key(),
 				], home_url( '/' ) );
-
-				$product_name = get_the_title( $sub->product_id ) ?: 'course subscription';
-				$site_name    = get_bloginfo( 'name' );
-				$amount_text  = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
-
 				$wa_message = sprintf(
-					"Hello! 👋\n\nYour child's subscription to *%s* on *%s* requires renewal.\n\nAmount: %s\n\nPay here: %s\n\nThank you! 🙏",
-					$product_name, $site_name, $amount_text, $pay_url
+					"Hello! 👋\n\nYour child *%s*'s subscription to *%s* on *%s* requires payment.\n\nAmount: %s\n\nPay here: %s\n\nThank you! 🙏",
+					$customer_name, $product_name, $site_name, $amount_text, $pay_url
 				);
-				$wa_link = IremboPay_Subscription_Manager::build_whatsapp_link( $sub->parent_whatsapp, $wa_message );
+			} else {
+				$wa_message = sprintf(
+					"Hello! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\nAmount: %s\n\nPlease contact us to complete payment. Thank you! 🙏",
+					$customer_name, $product_name, $site_name, $amount_text
+				);
 			}
+		} else {
+			$wa_message = sprintf(
+				"Hello! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\nAmount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
+				$customer_name, $product_name, $site_name, $amount_text
+			);
 		}
-		?>
-		<form method="post" action="<?php echo esc_url( $base ); ?>" style="display:flex;gap:4px;align-items:center;">
-			<input type="hidden" name="action"   value="irembopay_save_whatsapp">
-			<input type="hidden" name="sub_id"   value="<?php echo (int) $sub->id; ?>">
-			<input type="hidden" name="_nonce"   value="<?php echo esc_attr( $nonce ); ?>">
-			<input type="tel"    name="whatsapp" value="<?php echo $current; ?>"
-			       placeholder="+250 7XX XXX XXX"
-			       style="width:110px;font-size:12px;padding:3px 5px;border:1px solid #c3c4c7;border-radius:4px;"
-			       title="<?php esc_attr_e( 'Parent WhatsApp number', 'wc-irembopay' ); ?>">
-			<button type="submit"
-			        style="padding:3px 8px;font-size:12px;background:#16a34a;color:#fff;border:none;border-radius:4px;cursor:pointer;">
-				💾
-			</button>
-		</form>
-		<?php if ( $wa_link ) : ?>
-			<a href="<?php echo esc_url( $wa_link ); ?>" target="_blank"
-			   style="font-size:11px;color:#25d366;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;">
-				💬 <?php esc_html_e( 'Send via WhatsApp', 'wc-irembopay' ); ?>
-			</a>
-		<?php endif; ?>
-		<?php
-	}
 
-	public function handle_save_whatsapp(): void {
-		$sub_id = absint( $_POST['sub_id'] ?? 0 );
-		if ( ! current_user_can( 'manage_woocommerce' ) ||
-		     ! wp_verify_nonce( sanitize_text_field( $_POST['_nonce'] ?? '' ), 'irembopay_wa_' . $sub_id ) ) {
-			wp_die( 'Security check failed.' );
-		}
-		$number = sanitize_text_field( $_POST['whatsapp'] ?? '' );
-		IremboPay_Subscription_DB::update( $sub_id, [ 'parent_whatsapp' => $number ] );
-
-		wp_redirect( add_query_arg(
-			[ 'page' => 'irembopay-subscriptions', 'sub_message' => 'whatsapp_saved' ],
-			admin_url( 'admin.php' )
-		) );
-		exit;
+		$wa_link = IremboPay_Subscription_Manager::build_whatsapp_link( $parent_phone, $wa_message );
+		echo '<br><a href="' . esc_url( $wa_link ) . '" target="_blank"
+			style="font-size:11px;color:#25d366;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;">
+			💬 ' . esc_html__( 'Send WhatsApp', 'wc-irembopay' ) . '
+		</a>';
 	}
 
 	public function admin_notice(): void {
@@ -213,7 +205,6 @@ class IremboPay_Subscriptions_Admin {
 			'paused'            => __( 'Subscription paused.', 'wc-irembopay' ),
 			'reactivated'       => __( 'Subscription reactivated.', 'wc-irembopay' ),
 			'renewal_triggered' => __( 'Renewal invoice created and email sent to customer.', 'wc-irembopay' ),
-			'whatsapp_saved'    => __( 'Parent WhatsApp number saved.', 'wc-irembopay' ),
 		];
 		$key = sanitize_key( $_GET['sub_message'] );
 		if ( isset( $msgs[ $key ] ) ) {
