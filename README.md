@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.3
+- Fix: Correct user meta key for parent phone number (`phone_number` not `parent_phone`) — WhatsApp column now populates correctly from the Parent/Guardian profile field
+
 ### v2.6.2
 - New: "Minute(s)" billing period added to product subscription settings for testing renewal and expiry flows quickly (e.g. set "Bill every 10 Minutes" on a test product)
 

@@ -205,7 +205,7 @@ class IremboPay_Subscription_Manager {
 		// To find the exact keys on your install, run:
 		//   wp user meta get <user_id> --all | grep -i "parent\|guardian\|phone"
 		// or query: SELECT meta_key, meta_value FROM wp_usermeta WHERE user_id = <id> AND meta_key LIKE '%parent%'
-		$phone = get_user_meta( $user_id, 'parent_phone', true );
+		$phone = get_user_meta( $user_id, 'phone_number', true );
 		$email = get_user_meta( $user_id, 'parent_email', true );
 		return [
 			'phone' => sanitize_text_field( $phone ?: '' ),

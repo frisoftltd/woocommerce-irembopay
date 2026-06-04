@@ -146,10 +146,8 @@ class IremboPay_Subscriptions_Admin {
 		}
 
 		// Read parent phone from user profile meta.
-		// Meta key 'parent_phone' comes from the Parent / Guardian Information profile section.
-		// If the key differs on your install, update it here and in get_parent_contact().
-		// To find the actual key: wp user meta get <id> --all | grep -i "parent\|guardian\|phone"
-		$parent_phone = get_user_meta( $sub->user_id, 'parent_phone', true );
+		// Confirmed key from live DB (user 362): 'phone_number' (not 'parent_phone').
+		$parent_phone = get_user_meta( $sub->user_id, 'phone_number', true );
 		$parent_phone = sanitize_text_field( $parent_phone ?: ( $sub->parent_whatsapp ?? '' ) );
 
 		if ( empty( $parent_phone ) ) {
