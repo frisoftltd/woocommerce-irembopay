@@ -141,29 +141,32 @@ class IremboPay_Subscriptions_Admin {
 	private function render_whatsapp_field( object $sub ): void {
 		$user = get_userdata( $sub->user_id );
 		if ( ! $user ) {
-			echo '<span style="color:#aaa;font-size:12px">—</span>';
+			echo '<span style="font-size:12px;color:var(--color-text-secondary)">—</span>';
 			return;
 		}
 
-		// Read parent phone from user profile meta.
-		// Confirmed key from live DB (user 362): 'phone_number' (not 'parent_phone').
-		$parent_phone = get_user_meta( $sub->user_id, 'phone_number', true );
-		$parent_phone = sanitize_text_field( $parent_phone ?: ( $sub->parent_whatsapp ?? '' ) );
+		$parent_phone = sanitize_text_field( get_user_meta( $sub->user_id, 'phone_number', true ) ?: ( $sub->parent_whatsapp ?? '' ) );
 
 		if ( empty( $parent_phone ) ) {
-			echo '<span style="color:#aaa;font-size:11px">' . esc_html__( 'No parent phone', 'wc-irembopay' ) . '</span>';
+			echo '<span style="font-size:11px;color:#aaa">' . esc_html__( 'No parent phone', 'wc-irembopay' ) . '</span>';
 			return;
 		}
 
-		echo '<span style="font-size:12px;color:#333">' . esc_html( $parent_phone ) . '</span>';
-
-		$product_name  = get_the_title( $sub->product_id ) ?: 'course subscription';
+		// Shared variables used in all message branches
+		$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
+		$student_name  = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+		$student_first = trim( explode( ' ', $student_name )[0] );
+		$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		$site_name     = get_bloginfo( 'name' );
 		$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
-		$customer_name = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+		$grace_days    = (int) $sub->grace_period_days;
 
-		// Use live invoice pay link if available, otherwise a generic reminder message
+		// Show the phone number
+		echo '<span style="font-size:12px;color:#333">' . esc_html( $parent_phone ) . '</span>';
+
+		// Build the WhatsApp message
 		if ( ! empty( $sub->last_invoice ) && ! empty( $sub->renewal_order_id ) ) {
+			// Live invoice exists — use renewal/expiry message with pay link
 			$renewal_order = wc_get_order( (int) $sub->renewal_order_id );
 			if ( $renewal_order ) {
 				$pay_url = add_query_arg( [
@@ -172,54 +175,42 @@ class IremboPay_Subscriptions_Admin {
 					'invoice_number'    => rawurlencode( $sub->last_invoice ),
 					'key'               => $renewal_order->get_order_key(),
 				], home_url( '/' ) );
-				$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
-				$student_first = trim( explode( ' ', ( trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name ) )[0] );
-				$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-				$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
-				$grace_days    = (int) $sub->grace_period_days;
 
 				$wa_message = sprintf(
 					"Hello %s! 👋\n\n⚠️ Your child *%s*'s access to *%s* on *%s* expires soon!\n\n💳 Amount due: %s\n⏳ Only %d days left — after that access is suspended automatically.\n\n👉 Pay Now: %s\n\nThank you! 🙏",
 					$parent_name,
 					$student_first,
 					$clean_course,
-					get_bloginfo( 'name' ),
+					$site_name,
 					$amount_text,
 					$grace_days,
 					$pay_url
 				);
 			} else {
-				$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
-				$student_first = trim( explode( ' ', ( trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name ) )[0] );
-				$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-				$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
-
+				// Order missing — use fallback
 				$wa_message = sprintf(
 					"Hello %s! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\n💳 Amount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
 					$parent_name,
 					$student_first,
 					$clean_course,
-					get_bloginfo( 'name' ),
+					$site_name,
 					$amount_text
 				);
 			}
 		} else {
-			$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
-			$student_first = trim( explode( ' ', ( trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name ) )[0] );
-			$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-			$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
-
+			// No invoice yet (active subscription) — reminder message without pay link
 			$wa_message = sprintf(
 				"Hello %s! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\n💳 Amount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
 				$parent_name,
 				$student_first,
 				$clean_course,
-				get_bloginfo( 'name' ),
+				$site_name,
 				$amount_text
 			);
 		}
 
 		$wa_link = IremboPay_Subscription_Manager::build_whatsapp_link( $parent_phone, $wa_message );
+
 		echo '<br><a href="' . esc_url( $wa_link ) . '" target="_blank"
 			style="font-size:11px;color:#25d366;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;">
 			💬 ' . esc_html__( 'Send WhatsApp', 'wc-irembopay' ) . '

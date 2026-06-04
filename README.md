@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.5
+- Fix: WhatsApp message in admin now uses correct wording and parent name in all cases (active subscription, pending renewal, expired)
+- Fix: HTML entity decode applied correctly in admin WhatsApp field — course name now shows clean dashes instead of &#8211;
+
 ### v2.6.4
 - Fix: WhatsApp messages now addressed to parent by name (from `parent_name` user meta) instead of student
 - Fix: Course name HTML entities (e.g. `&#8211;`) now decoded to clean characters in WhatsApp messages
