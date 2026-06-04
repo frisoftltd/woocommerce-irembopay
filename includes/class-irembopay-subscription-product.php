@@ -155,7 +155,7 @@ class IremboPay_Subscription_Product {
 		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
 		$suffix         = $this->build_price_suffix( $interval, $unit, $total_payments );
 
-		return $html . '<div style="font-size:13px;color:#6b7280;margin-top:4px;">'
+		return $html . '<div style="font-size:1rem;font-weight:600;color:#222;margin-top:6px;letter-spacing:0.01em;">'
 			. esc_html( $suffix )
 			. '</div>';
 	}

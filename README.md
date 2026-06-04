@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.6
+- Improved: Billing period suffix on single course page now matches price font size and color
+
 ### v2.8.5
 - Fix: Single course page now shows billing period (e.g. "/ 6 months") below the price using tutor_course_details_wc_add_to_cart_price filter
 
