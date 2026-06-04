@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.5
+- Fix: Single course page now shows billing period (e.g. "/ 6 months") below the price using tutor_course_details_wc_add_to_cart_price filter
+
 ### v2.8.4
 - Fix: Single course page now shows "100 Rwf / 6 months" via get_tutor_course_price filter
 - Fix: Price suffix no longer duplicated when WooCommerce filter fires twice

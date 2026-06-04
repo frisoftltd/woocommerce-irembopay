@@ -8,6 +8,7 @@ class IremboPay_Subscription_Product {
 		add_action( 'woocommerce_product_data_panels',  [ $this, 'render_panel' ] );
 		add_action( 'woocommerce_process_product_meta', [ $this, 'save_subscription_data' ] );
 		add_filter( 'woocommerce_get_price_html',       [ $this, 'subscription_price_html' ], 10, 2 );
+		add_filter( 'tutor_course_details_wc_add_to_cart_price', [ $this, 'tutor_cart_price_suffix' ], 10, 2 );
 		add_filter( 'get_tutor_course_price',           [ $this, 'tutor_single_course_price' ], 10, 2 );
 		add_filter( 'tutor_course_price',               [ $this, 'tutor_course_price_html' ], 10, 2 );
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
@@ -139,6 +140,24 @@ class IremboPay_Subscription_Product {
 		}
 
 		return $price . ' ' . $suffix;
+	}
+
+	public function tutor_cart_price_suffix( string $html, $product ): string {
+		if ( ! $product instanceof WC_Product ) {
+			return $html;
+		}
+		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
+			return $html;
+		}
+
+		$interval       = (int) get_post_meta( $product->get_id(), '_irembopay_billing_cycle_value', true ) ?: 1;
+		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
+		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
+		$suffix         = $this->build_price_suffix( $interval, $unit, $total_payments );
+
+		return $html . '<div style="font-size:13px;color:#6b7280;margin-top:4px;">'
+			. esc_html( $suffix )
+			. '</div>';
 	}
 
 	public function tutor_single_course_price( $price, $course_id ): string {
