@@ -142,6 +142,15 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.7.0
+- New: Subscriptions admin rebuilt using WordPress WP_List_Table
+- New: Bulk actions — select multiple subscriptions and Pause, Cancel, or Delete in one click
+- New: Search box — search by student name, email, parent name, parent phone, or order number
+- New: Per-page selector — choose 25, 50, or 100 rows per page via Screen Options
+- New: Proper WordPress pagination with prev/next
+- Removed: ID column
+- Improved: Sortable columns (Status, Amount, Next Renewal)
+
 ### v2.6.9
 - Improved: Parent WhatsApp column now shows ⚠️ warning + Edit Profile link when no parent phone is on file
 - Improved: WhatsApp send button styled as a green pill badge

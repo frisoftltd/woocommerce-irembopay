@@ -105,4 +105,57 @@ class IremboPay_Subscription_DB {
 		$where = $status !== 'any' ? $wpdb->prepare( 'WHERE status = %s', $status ) : '';
 		return $wpdb->get_results( "SELECT * FROM {$t} {$where} ORDER BY id DESC LIMIT {$per_page} OFFSET {$offset}" );
 	}
+
+	public static function search( string $term, string $status = 'any', int $per_page = 25, int $offset = 0 ): array {
+		global $wpdb;
+		$t    = self::table();
+		$like = '%' . $wpdb->esc_like( $term ) . '%';
+
+		$where_status = $status !== 'any' ? $wpdb->prepare( 'AND s.status = %s', $status ) : '';
+
+		return $wpdb->get_results( $wpdb->prepare(
+			"SELECT DISTINCT s.* FROM {$t} s
+			 LEFT JOIN {$wpdb->users} u ON u.ID = s.user_id
+			 LEFT JOIN {$wpdb->usermeta} um_name  ON um_name.user_id  = s.user_id AND um_name.meta_key  = 'parent_name'
+			 LEFT JOIN {$wpdb->usermeta} um_phone ON um_phone.user_id = s.user_id AND um_phone.meta_key = 'phone_number'
+			 WHERE (
+			     u.display_name      LIKE %s OR
+			     u.user_email        LIKE %s OR
+			     um_name.meta_value  LIKE %s OR
+			     um_phone.meta_value LIKE %s OR
+			     s.parent_order_id   LIKE %s OR
+			     s.renewal_order_id  LIKE %s
+			 )
+			 {$where_status}
+			 ORDER BY s.id DESC
+			 LIMIT %d OFFSET %d",
+			$like, $like, $like, $like, $like, $like,
+			$per_page, $offset
+		) );
+	}
+
+	public static function search_count( string $term, string $status = 'any' ): int {
+		global $wpdb;
+		$t    = self::table();
+		$like = '%' . $wpdb->esc_like( $term ) . '%';
+
+		$where_status = $status !== 'any' ? $wpdb->prepare( 'AND s.status = %s', $status ) : '';
+
+		return (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(DISTINCT s.id) FROM {$t} s
+			 LEFT JOIN {$wpdb->users} u ON u.ID = s.user_id
+			 LEFT JOIN {$wpdb->usermeta} um_name  ON um_name.user_id  = s.user_id AND um_name.meta_key  = 'parent_name'
+			 LEFT JOIN {$wpdb->usermeta} um_phone ON um_phone.user_id = s.user_id AND um_phone.meta_key = 'phone_number'
+			 WHERE (
+			     u.display_name      LIKE %s OR
+			     u.user_email        LIKE %s OR
+			     um_name.meta_value  LIKE %s OR
+			     um_phone.meta_value LIKE %s OR
+			     s.parent_order_id   LIKE %s OR
+			     s.renewal_order_id  LIKE %s
+			 )
+			 {$where_status}",
+			$like, $like, $like, $like, $like, $like
+		) );
+	}
 }
