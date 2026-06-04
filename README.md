@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.8
+- Fix: WhatsApp link now uses esc_attr() instead of esc_url() — esc_url() was uppercasing %0a to %0A which WhatsApp Web ignores, causing line breaks to collapse
+
 ### v2.6.7
 - Fix: WhatsApp message line breaks now render correctly on WhatsApp Web desktop
 - Root cause: rawurlencode() produces uppercase %0A which WhatsApp Web ignores; switching to urlencode() per line joined with lowercase %0a fixes it

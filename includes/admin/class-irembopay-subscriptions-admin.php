@@ -211,7 +211,7 @@ class IremboPay_Subscriptions_Admin {
 
 		$wa_link = IremboPay_Subscription_Manager::build_whatsapp_link( $parent_phone, $wa_message );
 
-		echo '<br><a href="' . esc_url( $wa_link ) . '" target="_blank"
+		echo '<br><a href="' . esc_attr( $wa_link ) . '" target="_blank"
 			style="font-size:11px;color:#25d366;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;">
 			💬 ' . esc_html__( 'Send WhatsApp', 'wc-irembopay' ) . '
 		</a>';
