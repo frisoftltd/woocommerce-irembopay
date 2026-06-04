@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.6
+- Fix: WhatsApp links now use web.whatsapp.com instead of wa.me — line breaks render correctly in the desktop browser input box before sending
+
 ### v2.6.5
 - Fix: WhatsApp message in admin now uses correct wording and parent name in all cases (active subscription, pending renewal, expired)
 - Fix: HTML entity decode applied correctly in admin WhatsApp field — course name now shows clean dashes instead of &#8211;
