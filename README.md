@@ -142,6 +142,11 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.7.1
+- Fix: Bulk actions now work correctly — WP_List_Table must post back to the same page, not admin-post.php
+- Fix: Nonce key corrected to 'bulk-subscriptions' (WP convention: bulk- + plural)
+- Fix: Bulk action processed in load-{hook} before render, then redirects cleanly
+
 ### v2.7.0
 - New: Subscriptions admin rebuilt using WordPress WP_List_Table
 - New: Bulk actions — select multiple subscriptions and Pause, Cancel, or Delete in one click

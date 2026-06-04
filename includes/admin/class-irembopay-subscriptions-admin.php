@@ -66,9 +66,8 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 		$this->set_pagination_args( [
 			'total_items' => $total,
 			'per_page'    => $per_page,
-			'total_pages' => ceil( $total / $per_page ),
+			'total_pages' => ceil( $total / max( 1, $per_page ) ),
 		] );
-
 		$this->_column_headers = [ $this->get_columns(), [], $this->get_sortable_columns() ];
 	}
 
@@ -78,14 +77,16 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 
 	protected function column_customer( $item ): string {
 		$user = get_userdata( $item->user_id );
-		if ( ! $user ) { return '<em style="color:#aaa">' . __( 'Deleted', 'wc-irembopay' ) . '</em>'; }
+		if ( ! $user ) {
+			return '<em style="color:#aaa">' . __( 'Deleted', 'wc-irembopay' ) . '</em>';
+		}
 		return '<a href="' . esc_url( get_edit_user_link( $user->ID ) ) . '" style="font-weight:600">'
 			. esc_html( $user->display_name ) . '</a><br>'
 			. '<small style="color:#888">' . esc_html( $user->user_email ) . '</small>';
 	}
 
 	protected function column_product( $item ): string {
-		return '<a href="' . esc_url( get_edit_post_link( $item->product_id ) ) . '">'
+		return '<a href="' . esc_url( (string) get_edit_post_link( $item->product_id ) ) . '">'
 			. esc_html( get_the_title( $item->product_id ) ) . '</a>';
 	}
 
@@ -94,7 +95,10 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 	}
 
 	protected function column_billing( $item ): string {
-		return esc_html( IremboPay_Subscription_Manager::billing_label( $item->billing_period, (int) $item->billing_interval ) );
+		return esc_html( IremboPay_Subscription_Manager::billing_label(
+			$item->billing_period,
+			(int) $item->billing_interval
+		) );
 	}
 
 	protected function column_status( $item ): string {
@@ -116,7 +120,9 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 
 	protected function column_parent_whatsapp( $item ): string {
 		$user = get_userdata( $item->user_id );
-		if ( ! $user ) { return '<span style="color:#ccc">—</span>'; }
+		if ( ! $user ) {
+			return '<span style="color:#ccc">—</span>';
+		}
 
 		$parent_phone = sanitize_text_field(
 			get_user_meta( $item->user_id, 'phone_number', true ) ?: ( $item->parent_whatsapp ?? '' )
@@ -128,7 +134,8 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 		}
 
 		$parent_name   = sanitize_text_field( get_user_meta( $item->user_id, 'parent_name', true ) ?: 'Parent/Guardian' );
-		$student_first = trim( explode( ' ', trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name )[0] );
+		$student_name  = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
+		$student_first = trim( explode( ' ', $student_name )[0] );
 		$clean_course  = html_entity_decode( get_the_title( $item->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		$site_name     = get_bloginfo( 'name' );
 		$amount_text   = number_format( (float) $item->amount, 0, '.', ',' ) . ' ' . $item->currency;
@@ -167,13 +174,15 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 		$encoded = implode( '%0a', array_map( 'urlencode', explode( "\n", $message ) ) );
 		$wa_link = 'https://web.whatsapp.com/send?phone=' . $digits . '&text=' . $encoded;
 
-		return '<span style="font-size:12px;font-weight:600;color:#1a1a1a">📱 ' . esc_html( $parent_phone ) . '</span><br>'
+		return '<div style="line-height:1.8">'
+			. '<span style="font-size:12px;font-weight:600;color:#1a1a1a">📱 ' . esc_html( $parent_phone ) . '</span><br>'
 			. '<a href="' . esc_attr( $wa_link ) . '" target="_blank"
 				style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
 				       color:#fff;background:#25d366;padding:3px 10px;border-radius:12px;
 				       text-decoration:none;margin-top:3px;">
 				💬 ' . esc_html__( 'Send WhatsApp', 'wc-irembopay' ) . '
-			</a>';
+			</a>'
+			. '</div>';
 	}
 
 	protected function column_actions( $item ): string {
@@ -209,7 +218,7 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 				$out .= $btn( 'reactivate', '▶ Reactivate', '#16a34a' );
 				break;
 		}
-		$out .= '<a href="' . esc_url( get_edit_post_link( $item->parent_order_id ) ) . '"
+		$out .= '<a href="' . esc_url( (string) get_edit_post_link( $item->parent_order_id ) ) . '"
 			style="display:block;text-align:center;font-size:10px;color:#9ca3af;text-decoration:none;margin-top:4px;">
 			🧾 Order #' . (int) $item->parent_order_id . '
 		</a>';
@@ -228,7 +237,6 @@ class IremboPay_Subscriptions_Admin {
 	public function __construct() {
 		add_action( 'admin_menu',  [ $this, 'add_menu' ] );
 		add_action( 'admin_post_irembopay_subscription_action', [ $this, 'handle_action' ] );
-		add_action( 'admin_post_irembopay_bulk_action',         [ $this, 'handle_bulk_action' ] );
 		add_action( 'admin_notices', [ $this, 'admin_notice' ] );
 		add_filter( 'set_screen_option_irembopay_subs_per_page', [ $this, 'save_screen_option' ], 10, 3 );
 	}
@@ -242,15 +250,66 @@ class IremboPay_Subscriptions_Admin {
 			'irembopay-subscriptions',
 			[ $this, 'render_page' ]
 		);
-		add_action( "load-{$hook}", [ $this, 'screen_options' ] );
+		add_action( "load-{$hook}", [ $this, 'handle_bulk_and_screen' ] );
 	}
 
-	public function screen_options(): void {
+	public function handle_bulk_and_screen(): void {
+		// Screen options
 		add_screen_option( 'per_page', [
 			'label'   => __( 'Subscriptions per page', 'wc-irembopay' ),
 			'default' => 25,
 			'option'  => 'irembopay_subs_per_page',
 		] );
+
+		// Process bulk action BEFORE the page renders
+		if ( ! isset( $_POST['subscription_ids'] ) ) { return; }
+		if ( ! current_user_can( 'manage_woocommerce' ) ) { return; }
+		if ( ! check_admin_referer( 'bulk-subscriptions' ) ) { return; }
+
+		// WP_List_Table sends bulk action in 'action' (top bar) or 'action2' (bottom bar)
+		$bulk_action = sanitize_key(
+			( isset( $_POST['action'] ) && $_POST['action'] !== '-1' )
+				? $_POST['action']
+				: ( $_POST['action2'] ?? '-1' )
+		);
+
+		if ( $bulk_action === '-1' || empty( $bulk_action ) ) { return; }
+
+		$ids   = array_map( 'absint', $_POST['subscription_ids'] );
+		$count = 0;
+		global $wpdb;
+
+		foreach ( $ids as $id ) {
+			switch ( $bulk_action ) {
+				case 'bulk_pause':
+					IremboPay_Subscription_Manager::pause( $id );
+					$count++;
+					break;
+				case 'bulk_cancel':
+					IremboPay_Subscription_Manager::cancel( $id, 'Bulk admin action' );
+					$count++;
+					break;
+				case 'bulk_delete':
+					$wpdb->delete( IremboPay_Subscription_DB::table(), [ 'id' => $id ] );
+					$count++;
+					break;
+			}
+		}
+
+		$msg = match( $bulk_action ) {
+			'bulk_pause'  => 'bulk_paused',
+			'bulk_cancel' => 'bulk_cancelled',
+			'bulk_delete' => 'bulk_deleted',
+			default       => 'unknown',
+		};
+
+		wp_redirect( add_query_arg( [
+			'page'        => 'irembopay-subscriptions',
+			'sub_status'  => sanitize_key( $_POST['sub_status'] ?? 'any' ),
+			'sub_message' => $msg,
+			'count'       => $count,
+		], admin_url( 'admin.php' ) ) );
+		exit;
 	}
 
 	public function save_screen_option( $status, string $option, $value ): int {
@@ -290,72 +349,22 @@ class IremboPay_Subscriptions_Admin {
 				<?php endforeach; ?>
 			</ul>
 
-			<form method="get">
+			<?php
+			// Search form — GET request so search term stays in the URL
+			$list_table->search_box( __( 'Search subscriptions', 'wc-irembopay' ), 'subscription' );
+			?>
+
+			<form method="post">
 				<input type="hidden" name="page" value="irembopay-subscriptions">
 				<input type="hidden" name="sub_status" value="<?php echo esc_attr( $status ); ?>">
-				<?php $list_table->search_box( __( 'Search subscriptions', 'wc-irembopay' ), 'subscription' ); ?>
-			</form>
-
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="irembopay_bulk_action">
-				<input type="hidden" name="sub_status" value="<?php echo esc_attr( $status ); ?>">
 				<?php
-				wp_nonce_field( 'irembopay_bulk_action', '_bulk_nonce' );
+				// Nonce name MUST be 'bulk-' + plural from WP_List_Table constructor
+				wp_nonce_field( 'bulk-subscriptions' );
 				$list_table->display();
 				?>
 			</form>
 		</div>
 		<?php
-	}
-
-	public function handle_bulk_action(): void {
-		if ( ! current_user_can( 'manage_woocommerce' ) ||
-		     ! wp_verify_nonce( sanitize_text_field( $_POST['_bulk_nonce'] ?? '' ), 'irembopay_bulk_action' ) ) {
-			wp_die( 'Security check failed.' );
-		}
-
-		$bulk_action = sanitize_key( $_POST['action'] ?? $_POST['action2'] ?? '' );
-		$ids         = array_map( 'absint', $_POST['subscription_ids'] ?? [] );
-
-		if ( empty( $ids ) ) {
-			wp_redirect( add_query_arg( [ 'page' => 'irembopay-subscriptions', 'sub_message' => 'no_selection' ], admin_url( 'admin.php' ) ) );
-			exit;
-		}
-
-		global $wpdb;
-		$count = 0;
-
-		foreach ( $ids as $id ) {
-			switch ( $bulk_action ) {
-				case 'bulk_pause':
-					IremboPay_Subscription_Manager::pause( $id );
-					$count++;
-					break;
-				case 'bulk_cancel':
-					IremboPay_Subscription_Manager::cancel( $id, 'Bulk admin action' );
-					$count++;
-					break;
-				case 'bulk_delete':
-					$wpdb->delete( IremboPay_Subscription_DB::table(), [ 'id' => $id ] );
-					$count++;
-					break;
-			}
-		}
-
-		$msg = match( $bulk_action ) {
-			'bulk_pause'  => 'bulk_paused',
-			'bulk_cancel' => 'bulk_cancelled',
-			'bulk_delete' => 'bulk_deleted',
-			default       => 'unknown',
-		};
-
-		wp_redirect( add_query_arg( [
-			'page'        => 'irembopay-subscriptions',
-			'sub_status'  => sanitize_key( $_POST['sub_status'] ?? 'any' ),
-			'sub_message' => $msg,
-			'count'       => $count,
-		], admin_url( 'admin.php' ) ) );
-		exit;
 	}
 
 	public function handle_action(): void {
