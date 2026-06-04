@@ -142,6 +142,12 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.9
+- Improved: Parent WhatsApp column now shows ⚠️ warning + Edit Profile link when no parent phone is on file
+- Improved: WhatsApp send button styled as a green pill badge
+- Improved: Actions column buttons now stacked vertically with icons, more readable
+- Improved: Order link moved below action buttons, smaller and unobtrusive
+
 ### v2.6.8
 - Fix: WhatsApp link now uses esc_attr() instead of esc_url() — esc_url() was uppercasing %0a to %0A which WhatsApp Web ignores, causing line breaks to collapse
 

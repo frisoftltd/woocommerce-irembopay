@@ -42,9 +42,9 @@ class IremboPay_Subscriptions_Admin {
 						<th><?php esc_html_e( 'Amount', 'wc-irembopay' ); ?></th>
 						<th><?php esc_html_e( 'Billing', 'wc-irembopay' ); ?></th>
 						<th><?php esc_html_e( 'Status', 'wc-irembopay' ); ?></th>
-						<th style="width:90px"><?php esc_html_e( 'Next Renewal', 'wc-irembopay' ); ?></th>
-						<th style="width:180px"><?php esc_html_e( 'Parent WhatsApp', 'wc-irembopay' ); ?></th>
-						<th><?php esc_html_e( 'Actions', 'wc-irembopay' ); ?></th>
+						<th style="width:100px"><?php esc_html_e( 'Next Renewal', 'wc-irembopay' ); ?></th>
+						<th style="width:160px"><?php esc_html_e( 'Parent WhatsApp', 'wc-irembopay' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Actions', 'wc-irembopay' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -85,24 +85,45 @@ class IremboPay_Subscriptions_Admin {
 	private function render_actions( object $sub ): void {
 		$nonce = wp_create_nonce( 'irembopay_sub_action_' . $sub->id );
 		$base  = admin_url( 'admin-post.php' );
-		$btn   = fn( string $do, string $lbl, string $color ) =>
-			'<a href="' . esc_url( add_query_arg( [ 'action' => 'irembopay_subscription_action', 'sub_id' => $sub->id, 'do' => $do, '_nonce' => $nonce ], $base ) ) . '" style="margin-right:4px;padding:3px 8px;border-radius:4px;background:' . $color . ';color:#fff;text-decoration:none;font-size:12px">' . esc_html( $lbl ) . '</a>';
+
+		$btn = fn( string $do, string $lbl, string $bg ) =>
+			'<a href="' . esc_url( add_query_arg( [
+				'action' => 'irembopay_subscription_action',
+				'sub_id' => $sub->id,
+				'do'     => $do,
+				'_nonce' => $nonce,
+			], $base ) ) . '"
+			style="display:block;text-align:center;margin-bottom:4px;padding:4px 10px;
+			       border-radius:5px;background:' . $bg . ';color:#fff;
+			       text-decoration:none;font-size:11px;font-weight:600;white-space:nowrap;">
+				' . esc_html( $lbl ) . '
+			</a>';
+
+		echo '<div style="min-width:90px;">';
 
 		switch ( $sub->status ) {
 			case 'active':
-				echo $btn( 'pause',      __( 'Pause',      'wc-irembopay' ), '#6b7280' );
-				echo $btn( 'cancel',     __( 'Cancel',     'wc-irembopay' ), '#dc2626' );
-				echo $btn( 'renew_now',  __( 'Renew Now',  'wc-irembopay' ), '#2563eb' );
+				echo $btn( 'pause',     __( '⏸ Pause',      'wc-irembopay' ), '#6b7280' );
+				echo $btn( 'cancel',    __( '✖ Cancel',     'wc-irembopay' ), '#dc2626' );
+				echo $btn( 'renew_now', __( '↻ Renew Now',  'wc-irembopay' ), '#2563eb' );
 				break;
 			case 'paused':
-				echo $btn( 'reactivate', __( 'Reactivate', 'wc-irembopay' ), '#16a34a' );
-				echo $btn( 'cancel',     __( 'Cancel',     'wc-irembopay' ), '#dc2626' );
+				echo $btn( 'reactivate', __( '▶ Reactivate', 'wc-irembopay' ), '#16a34a' );
+				echo $btn( 'cancel',     __( '✖ Cancel',     'wc-irembopay' ), '#dc2626' );
 				break;
-			case 'cancelled': case 'expired':
-				echo $btn( 'reactivate', __( 'Reactivate', 'wc-irembopay' ), '#16a34a' );
+			case 'cancelled':
+			case 'expired':
+				echo $btn( 'reactivate', __( '▶ Reactivate', 'wc-irembopay' ), '#16a34a' );
 				break;
 		}
-		echo '<a href="' . esc_url( get_edit_post_link( $sub->parent_order_id ) ) . '" style="font-size:12px;color:#888;margin-left:4px">' . esc_html__( 'Order', 'wc-irembopay' ) . ' #' . (int) $sub->parent_order_id . '</a>';
+
+		echo '<a href="' . esc_url( get_edit_post_link( $sub->parent_order_id ) ) . '"
+			style="display:block;text-align:center;font-size:10px;color:#9ca3af;
+			       text-decoration:none;margin-top:4px;">
+			🧾 ' . esc_html__( 'Order', 'wc-irembopay' ) . ' #' . (int) $sub->parent_order_id . '
+		</a>';
+
+		echo '</div>';
 	}
 
 	public function handle_action(): void {
@@ -140,19 +161,27 @@ class IremboPay_Subscriptions_Admin {
 
 	private function render_whatsapp_field( object $sub ): void {
 		$user = get_userdata( $sub->user_id );
+
+		// Deleted user
 		if ( ! $user ) {
-			echo '<span style="font-size:12px;color:var(--color-text-secondary)">—</span>';
+			echo '<span style="color:#ccc;font-size:13px;">—</span>';
 			return;
 		}
 
-		$parent_phone = sanitize_text_field( get_user_meta( $sub->user_id, 'phone_number', true ) ?: ( $sub->parent_whatsapp ?? '' ) );
+		$parent_phone = sanitize_text_field(
+			get_user_meta( $sub->user_id, 'phone_number', true ) ?: ( $sub->parent_whatsapp ?? '' )
+		);
 
+		// No phone — show warning + edit profile link
 		if ( empty( $parent_phone ) ) {
-			echo '<span style="font-size:11px;color:#aaa">' . esc_html__( 'No parent phone', 'wc-irembopay' ) . '</span>';
+			$edit_url = get_edit_user_link( $sub->user_id );
+			echo '<div style="line-height:1.6;">';
+			echo '<span style="color:#f59e0b;font-size:12px;font-weight:600;">⚠️ No parent info</span><br>';
+			echo '<a href="' . esc_url( $edit_url ) . '" style="font-size:11px;color:#2563eb;text-decoration:none;">✏️ Edit Profile</a>';
+			echo '</div>';
 			return;
 		}
 
-		// Shared variables used in all message branches
 		$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
 		$student_name  = trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name;
 		$student_first = trim( explode( ' ', $student_name )[0] );
@@ -161,12 +190,8 @@ class IremboPay_Subscriptions_Admin {
 		$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
 		$grace_days    = (int) $sub->grace_period_days;
 
-		// Show the phone number
-		echo '<span style="font-size:12px;color:#333">' . esc_html( $parent_phone ) . '</span>';
-
-		// Build the WhatsApp message
+		// Build message
 		if ( ! empty( $sub->last_invoice ) && ! empty( $sub->renewal_order_id ) ) {
-			// Live invoice exists — use renewal/expiry message with pay link
 			$renewal_order = wc_get_order( (int) $sub->renewal_order_id );
 			if ( $renewal_order ) {
 				$pay_url = add_query_arg( [
@@ -175,46 +200,41 @@ class IremboPay_Subscriptions_Admin {
 					'invoice_number'    => rawurlencode( $sub->last_invoice ),
 					'key'               => $renewal_order->get_order_key(),
 				], home_url( '/' ) );
-
-				$wa_message = sprintf(
+				$message = sprintf(
 					"Hello %s! 👋\n\n⚠️ Your child *%s*'s access to *%s* on *%s* expires soon!\n\n💳 Amount due: %s\n⏳ Only %d days left — after that access is suspended automatically.\n\n👉 Pay Now: %s\n\nThank you! 🙏",
-					$parent_name,
-					$student_first,
-					$clean_course,
-					$site_name,
-					$amount_text,
-					$grace_days,
-					$pay_url
+					$parent_name, $student_first, $clean_course, $site_name, $amount_text, $grace_days, $pay_url
 				);
 			} else {
-				// Order missing — use fallback
-				$wa_message = sprintf(
+				$message = sprintf(
 					"Hello %s! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\n💳 Amount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
-					$parent_name,
-					$student_first,
-					$clean_course,
-					$site_name,
-					$amount_text
+					$parent_name, $student_first, $clean_course, $site_name, $amount_text
 				);
 			}
 		} else {
-			// No invoice yet (active subscription) — reminder message without pay link
-			$wa_message = sprintf(
+			$message = sprintf(
 				"Hello %s! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\n💳 Amount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
-				$parent_name,
-				$student_first,
-				$clean_course,
-				$site_name,
-				$amount_text
+				$parent_name, $student_first, $clean_course, $site_name, $amount_text
 			);
 		}
 
-		$wa_link = IremboPay_Subscription_Manager::build_whatsapp_link( $parent_phone, $wa_message );
+		// Build WhatsApp link with lowercase %0a (esc_attr not esc_url to preserve case)
+		$digits = preg_replace( '/\D/', '', $parent_phone );
+		if ( strlen( $digits ) === 10 && str_starts_with( $digits, '0' ) ) {
+			$digits = '250' . ltrim( $digits, '0' );
+		}
+		$lines   = explode( "\n", $message );
+		$encoded = implode( '%0a', array_map( 'urlencode', $lines ) );
+		$wa_link = 'https://web.whatsapp.com/send?phone=' . $digits . '&text=' . $encoded;
 
-		echo '<br><a href="' . esc_attr( $wa_link ) . '" target="_blank"
-			style="font-size:11px;color:#25d366;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px;">
+		echo '<div style="line-height:1.8;">';
+		echo '<span style="font-size:12px;font-weight:600;color:#1a1a1a;">📱 ' . esc_html( $parent_phone ) . '</span><br>';
+		echo '<a href="' . esc_attr( $wa_link ) . '" target="_blank"
+			style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;
+			       color:#fff;background:#25d366;padding:3px 10px;border-radius:12px;
+			       text-decoration:none;margin-top:2px;">
 			💬 ' . esc_html__( 'Send WhatsApp', 'wc-irembopay' ) . '
 		</a>';
+		echo '</div>';
 	}
 
 	public function admin_notice(): void {
