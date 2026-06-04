@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.1
+- Config: Cron switched back to production timing — renewals run daily at midnight, expiry checks run twice daily
+
 ### v2.8.0
 - New: Total Payments / Installment system — set how many payments a student makes before they own the course permanently
 - New: "Total Payments" field on product IremboPay Subscription tab (0 = renews forever)

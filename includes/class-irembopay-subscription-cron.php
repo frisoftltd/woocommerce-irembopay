@@ -23,10 +23,10 @@ class IremboPay_Subscription_Cron {
 
 	public static function schedule(): void {
 		if ( ! wp_next_scheduled( self::RENEWAL_HOOK ) ) {
-			wp_schedule_event( time() + 300, 'every5minutes', self::RENEWAL_HOOK );
+			wp_schedule_event( strtotime( 'tomorrow midnight' ), 'daily', self::RENEWAL_HOOK );
 		}
 		if ( ! wp_next_scheduled( self::EXPIRY_HOOK ) ) {
-			wp_schedule_event( time() + 300, 'every5minutes', self::EXPIRY_HOOK );
+			wp_schedule_event( time() + 300, 'twicedaily', self::EXPIRY_HOOK );
 		}
 	}
 
