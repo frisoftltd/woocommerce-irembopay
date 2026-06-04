@@ -95,10 +95,17 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 	}
 
 	protected function column_billing( $item ): string {
-		return esc_html( IremboPay_Subscription_Manager::billing_label(
-			$item->billing_period,
-			(int) $item->billing_interval
-		) );
+		$label          = IremboPay_Subscription_Manager::billing_label( $item->billing_period, (int) $item->billing_interval );
+		$total_payments = (int) ( $item->total_payments ?? 0 );
+		$payments_made  = (int) ( $item->payments_made  ?? 0 );
+
+		if ( $total_payments > 0 ) {
+			$progress = '<br><small style="color:#6b7280">'
+				. sprintf( __( '%d / %d payments', 'wc-irembopay' ), $payments_made, $total_payments )
+				. '</small>';
+			return esc_html( $label ) . $progress;
+		}
+		return esc_html( $label );
 	}
 
 	protected function column_status( $item ): string {
@@ -108,6 +115,7 @@ class IremboPay_Subscription_List_Table extends WP_List_Table {
 			'paused'          => '#6b7280',
 			'cancelled'       => '#dc2626',
 			'expired'         => '#dc2626',
+			'owned'           => '#7c3aed',
 		];
 		$color = $colors[ $item->status ] ?? '#888';
 		return '<span style="color:' . esc_attr( $color ) . ';font-weight:700">'

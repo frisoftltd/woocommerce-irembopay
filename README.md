@@ -142,6 +142,15 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.0
+- New: Total Payments / Installment system — set how many payments a student makes before they own the course permanently
+- New: "Total Payments" field on product IremboPay Subscription tab (0 = renews forever)
+- New: After final payment, subscription status changes to "owned" — no more renewals, permanent course access
+- New: Payments progress shown in admin subscription table (e.g. "2 / 3 payments")
+- New: "Owned" status shown in purple in admin table
+- New: Price display on course page shows payment breakdown (e.g. "100 Rwf / 1 Month × 6 payments")
+- DB: Added total_payments and payments_made columns with auto-migration
+
 ### v2.7.3
 - Fix: Tutor LMS product link now detected via both _tutor_course_product_id (UI key) and _tutor_product (legacy key) — courses linked via the Tutor LMS UI now automatically revoke/restore access without any manual setup
 

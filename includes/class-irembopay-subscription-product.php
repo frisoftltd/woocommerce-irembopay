@@ -68,6 +68,13 @@ class IremboPay_Subscription_Product {
 					       value="<?php echo esc_attr( $grace ); ?>"
 					       min="0" max="30" style="width:60px">
 				</p>
+				<p class="form-field">
+					<label><?php esc_html_e( 'Total Payments', 'wc-irembopay' ); ?></label>
+					<input type="number" name="_irembopay_total_payments"
+					       value="<?php echo esc_attr( get_post_meta( $id, '_irembopay_total_payments', true ) ?: 0 ); ?>"
+					       min="0" max="999" style="width:60px">
+					<span class="description"><?php esc_html_e( 'Number of payments before course is owned permanently. 0 = renews forever.', 'wc-irembopay' ); ?></span>
+				</p>
 			</div>
 			<div class="options_group">
 				<?php woocommerce_wp_text_input( [
@@ -108,6 +115,8 @@ class IremboPay_Subscription_Product {
 		update_post_meta( $product_id, '_irembopay_billing_cycle_value', $cy_value );
 		update_post_meta( $product_id, '_irembopay_billing_cycle_unit',  $cy_unit );
 		update_post_meta( $product_id, '_irembopay_grace_period',        $grace );
+		$total_payments = max( 0, absint( $_POST['_irembopay_total_payments'] ?? 0 ) );
+		update_post_meta( $product_id, '_irembopay_total_payments', $total_payments );
 		update_post_meta( $product_id, '_irembopay_product_code', sanitize_text_field( $_POST['_irembopay_product_code'] ?? '' ) );
 	}
 
@@ -115,6 +124,17 @@ class IremboPay_Subscription_Product {
 		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return $price; }
 		$interval = (int) get_post_meta( $product->get_id(), '_irembopay_billing_cycle_value', true ) ?: 1;
 		$unit     = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
+		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
+		if ( $total_payments > 0 ) {
+			return sprintf(
+				'%s / %d %s &times; %d %s',
+				$price,
+				$interval,
+				esc_html( $unit ),
+				$total_payments,
+				esc_html( _n( 'payment', 'payments', $total_payments, 'wc-irembopay' ) )
+			);
+		}
 		return sprintf( '%s / %d %s', $price, $interval, esc_html( $unit ) );
 	}
 

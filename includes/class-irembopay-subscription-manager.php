@@ -25,6 +25,7 @@ class IremboPay_Subscription_Manager {
 			$period   = get_post_meta( $product_id, '_irembopay_billing_cycle_unit',  true ) ?: 'month';
 			$interval = (int) get_post_meta( $product_id, '_irembopay_billing_cycle_value', true ) ?: 1;
 			$grace    = (int) get_post_meta( $product_id, '_irembopay_grace_period',        true ) ?: 3;
+			$total_payments = (int) get_post_meta( $product_id, '_irembopay_total_payments', true );
 			$amount   = (float) ( $item->get_total() / max( 1, $item->get_quantity() ) );
 
 			$now = current_time( 'mysql' );
@@ -42,6 +43,8 @@ class IremboPay_Subscription_Manager {
 				'start_date'       => $now,
 				'end_date'         => null,
 				'grace_period_days'=> $grace,
+				'total_payments'   => $total_payments,
+				'payments_made'    => 1,
 			] );
 
 			if ( ! $sub_id ) { continue; }
@@ -127,15 +130,43 @@ class IremboPay_Subscription_Manager {
 	}
 
 	public static function complete_renewal( object $sub, WC_Order $renewal_order ): void {
+		$payments_made  = (int) $sub->payments_made + 1;
+		$total_payments = (int) $sub->total_payments;
+
+		// Check if all payments are complete → grant permanent ownership
+		if ( $total_payments > 0 && $payments_made >= $total_payments ) {
+			IremboPay_Subscription_DB::update( $sub->id, [
+				'status'           => self::STATUS_OWNED,
+				'payments_made'    => $payments_made,
+				'renewal_order_id' => null,
+				'last_invoice'     => null,
+			] );
+			$renewal_order->add_order_note( sprintf(
+				__( 'IremboPay subscription #%d — all %d payments completed. Course ownership granted permanently.', 'wc-irembopay' ),
+				$sub->id, $total_payments
+			) );
+			IremboPay_Logger::info( "Subscription #{$sub->id} — all {$total_payments} payments done. Status: owned." );
+			do_action( 'irembopay_subscription_owned', $sub->id, $renewal_order );
+			return;
+		}
+
+		// Normal renewal — more payments still due
 		$next = self::calc_next_renewal( current_time( 'mysql' ), $sub->billing_period, (int) $sub->billing_interval );
 		IremboPay_Subscription_DB::update( $sub->id, [
 			'status'           => self::STATUS_ACTIVE,
+			'payments_made'    => $payments_made,
 			'next_renewal'     => $next,
 			'renewal_order_id' => null,
 			'last_invoice'     => null,
 		] );
-		$renewal_order->add_order_note( sprintf( __( 'IremboPay subscription #%d renewed. Next renewal: %s', 'wc-irembopay' ), $sub->id, $next ) );
-		IremboPay_Logger::info( "Subscription #{$sub->id} renewed. Next: {$next}." );
+		$renewal_order->add_order_note( sprintf(
+			__( 'IremboPay subscription #%d renewed. Payment %d of %s. Next renewal: %s', 'wc-irembopay' ),
+			$sub->id,
+			$payments_made,
+			$total_payments > 0 ? $total_payments : '∞',
+			$next
+		) );
+		IremboPay_Logger::info( "Subscription #{$sub->id} renewed. Payment {$payments_made}/" . ( $total_payments ?: '∞' ) . ". Next: {$next}." );
 		do_action( 'irembopay_subscription_renewed', $sub->id, $renewal_order );
 	}
 

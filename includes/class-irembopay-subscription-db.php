@@ -30,6 +30,8 @@ class IremboPay_Subscription_DB {
 			grace_period_days TINYINT(3)  UNSIGNED NOT NULL DEFAULT 3,
 			last_invoice     VARCHAR(120) DEFAULT NULL,
 			renewal_order_id BIGINT(20)   UNSIGNED DEFAULT NULL,
+			total_payments   TINYINT(3)   UNSIGNED NOT NULL DEFAULT 0,
+			payments_made    TINYINT(3)   UNSIGNED NOT NULL DEFAULT 0,
 			parent_whatsapp  VARCHAR(30)  DEFAULT NULL,
 			created_at       DATETIME     NOT NULL,
 			updated_at       DATETIME     NOT NULL,
@@ -45,7 +47,15 @@ class IremboPay_Subscription_DB {
 		if ( empty( $col ) ) {
 		    $wpdb->query( "ALTER TABLE {$table} ADD COLUMN parent_whatsapp VARCHAR(30) DEFAULT NULL AFTER renewal_order_id" );
 		}
-		update_option( 'irembopay_subscription_db_version', '1.1' );
+		$col2 = $wpdb->get_results( "SHOW COLUMNS FROM {$table} LIKE 'total_payments'" );
+		if ( empty( $col2 ) ) {
+		    $wpdb->query( "ALTER TABLE {$table} ADD COLUMN total_payments TINYINT(3) UNSIGNED NOT NULL DEFAULT 0 AFTER renewal_order_id" );
+		}
+		$col3 = $wpdb->get_results( "SHOW COLUMNS FROM {$table} LIKE 'payments_made'" );
+		if ( empty( $col3 ) ) {
+		    $wpdb->query( "ALTER TABLE {$table} ADD COLUMN payments_made TINYINT(3) UNSIGNED NOT NULL DEFAULT 0 AFTER total_payments" );
+		}
+		update_option( 'irembopay_subscription_db_version', '1.2' );
 	}
 
 	public static function insert( array $data ) {
