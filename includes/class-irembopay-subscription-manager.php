@@ -441,11 +441,11 @@ class IremboPay_Subscription_Manager {
 <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
 .w{max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)}
-.h{background:#2563eb;color:#fff;padding:28px 32px}.h h1{margin:0;font-size:22px}
+.h{background:#132241;color:#fff;padding:28px 32px}.h h1{margin:0;font-size:22px}
 .b{padding:32px;color:#333;line-height:1.7}
-.box{background:#f0f7ff;border-left:4px solid #2563eb;padding:16px 20px;border-radius:4px;margin:20px 0}
-.box strong{font-size:1.35em;color:#1d4ed8}
-.btn{display:inline-block;background:#2563eb;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;font-size:16px;margin:20px 0}
+.box{background:#f0f7ff;border-left:4px solid #132241;padding:16px 20px;border-radius:4px;margin:20px 0}
+.box strong{font-size:1.35em;color:#132241}
+.btn{display:inline-block;background:#132241;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;font-size:16px;margin:20px 0}
 .warn{background:#fff7ed;border-left:4px solid #f59e0b;padding:12px 16px;border-radius:4px;font-size:.9em;color:#92400e;margin-top:16px}
 .meta{font-size:.82em;color:#999;border-top:1px solid #eee;padding-top:14px;margin-top:20px}
 .foot{background:#f9f9f9;padding:14px 32px;font-size:12px;color:#aaa;text-align:center}
@@ -477,7 +477,7 @@ body{font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:20px}
 .b{padding:32px;color:#333;line-height:1.7}
 .box{background:#fef2f2;border-left:4px solid #dc2626;padding:16px 20px;border-radius:4px;margin:20px 0}
 .box strong{font-size:1.35em;color:#b91c1c}
-.btn{display:inline-block;background:#16a34a;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;font-size:16px;margin:20px 0}
+.btn{display:inline-block;background:#132241;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:bold;font-size:16px;margin:20px 0}
 .info{background:#f0fdf4;border-left:4px solid #16a34a;padding:12px 16px;border-radius:4px;font-size:.9em;color:#166534;margin-top:16px}
 .meta{font-size:.82em;color:#999;border-top:1px solid #eee;padding-top:14px;margin-top:20px}
 .foot{background:#f9f9f9;padding:14px 32px;font-size:12px;color:#aaa;text-align:center}

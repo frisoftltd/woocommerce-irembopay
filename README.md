@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.7.2
+- Fix: Course access revocation now works correctly — replaced $wpdb->update() with $wpdb->query() + prepare() for reliable multi-condition WHERE clause
+- Fix: Email brand color updated to #132241 across renewal and expiry email templates (header, button, accent)
+
 ### v2.7.1
 - Fix: Bulk actions now work correctly — WP_List_Table must post back to the same page, not admin-post.php
 - Fix: Nonce key corrected to 'bulk-subscriptions' (WP convention: bulk- + plural)

@@ -129,7 +129,14 @@ class IremboPay_Tutor_Integration {
 				$this->enroll_user_in_course( $user_id, $course_id, $order_id );
 			} else {
 				global $wpdb;
-				$wpdb->update( $wpdb->posts, [ 'post_status' => 'cancel' ], [ 'post_type' => 'tutor_enrolled', 'post_author' => $user_id, 'post_parent' => $course_id ], [ '%s' ], [ '%s', '%d', '%d' ] );
+				$wpdb->query( $wpdb->prepare(
+					"UPDATE {$wpdb->posts} SET post_status = 'cancel'
+					 WHERE post_type = 'tutor_enrolled'
+					 AND post_author = %d
+					 AND post_parent = %d",
+					$user_id,
+					$course_id
+				) );
 				IremboPay_Logger::info( "Tutor enrollment cancelled: user #{$user_id} / course #{$course_id}." );
 			}
 		}
