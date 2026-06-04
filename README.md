@@ -142,6 +142,12 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.4
+- Fix: WhatsApp messages now addressed to parent by name (from `parent_name` user meta) instead of student
+- Fix: Course name HTML entities (e.g. `&#8211;`) now decoded to clean characters in WhatsApp messages
+- Fix: Student referenced by first name only in message body
+- Fix: All three WhatsApp message templates (renewal, expiry, admin manual) updated to approved wording with amount, grace period days, and direct Pay Now link
+
 ### v2.6.3
 - Fix: Correct user meta key for parent phone number (`phone_number` not `parent_phone`) — WhatsApp column now populates correctly from the Parent/Guardian profile field
 

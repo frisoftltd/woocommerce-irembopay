@@ -172,20 +172,50 @@ class IremboPay_Subscriptions_Admin {
 					'invoice_number'    => rawurlencode( $sub->last_invoice ),
 					'key'               => $renewal_order->get_order_key(),
 				], home_url( '/' ) );
+				$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
+				$student_first = trim( explode( ' ', ( trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name ) )[0] );
+				$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
+				$grace_days    = (int) $sub->grace_period_days;
+
 				$wa_message = sprintf(
-					"Hello! 👋\n\nYour child *%s*'s subscription to *%s* on *%s* requires payment.\n\nAmount: %s\n\nPay here: %s\n\nThank you! 🙏",
-					$customer_name, $product_name, $site_name, $amount_text, $pay_url
+					"Hello %s! 👋\n\n⚠️ Your child *%s*'s access to *%s* on *%s* expires soon!\n\n💳 Amount due: %s\n⏳ Only %d days left — after that access is suspended automatically.\n\n👉 Pay Now: %s\n\nThank you! 🙏",
+					$parent_name,
+					$student_first,
+					$clean_course,
+					get_bloginfo( 'name' ),
+					$amount_text,
+					$grace_days,
+					$pay_url
 				);
 			} else {
+				$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
+				$student_first = trim( explode( ' ', ( trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name ) )[0] );
+				$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
+
 				$wa_message = sprintf(
-					"Hello! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\nAmount: %s\n\nPlease contact us to complete payment. Thank you! 🙏",
-					$customer_name, $product_name, $site_name, $amount_text
+					"Hello %s! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\n💳 Amount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
+					$parent_name,
+					$student_first,
+					$clean_course,
+					get_bloginfo( 'name' ),
+					$amount_text
 				);
 			}
 		} else {
+			$parent_name   = sanitize_text_field( get_user_meta( $sub->user_id, 'parent_name', true ) ?: __( 'Parent/Guardian', 'wc-irembopay' ) );
+			$student_first = trim( explode( ' ', ( trim( $user->first_name . ' ' . $user->last_name ) ?: $user->display_name ) )[0] );
+			$clean_course  = html_entity_decode( get_the_title( $sub->product_id ) ?: 'course subscription', ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
+
 			$wa_message = sprintf(
-				"Hello! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\nAmount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
-				$customer_name, $product_name, $site_name, $amount_text
+				"Hello %s! 👋\n\nThis is a reminder about *%s*'s subscription to *%s* on *%s*.\n\n💳 Amount: %s per billing cycle.\n\nPlease contact us if you have any questions. Thank you! 🙏",
+				$parent_name,
+				$student_first,
+				$clean_course,
+				get_bloginfo( 'name' ),
+				$amount_text
 			);
 		}
 

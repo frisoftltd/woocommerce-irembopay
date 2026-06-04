@@ -201,16 +201,20 @@ class IremboPay_Subscription_Manager {
 	}
 
 	private static function get_parent_contact( int $user_id ): array {
-		// Meta keys from the Parent / Guardian Information section of the user profile.
-		// To find the exact keys on your install, run:
-		//   wp user meta get <user_id> --all | grep -i "parent\|guardian\|phone"
-		// or query: SELECT meta_key, meta_value FROM wp_usermeta WHERE user_id = <id> AND meta_key LIKE '%parent%'
 		$phone = get_user_meta( $user_id, 'phone_number', true );
 		$email = get_user_meta( $user_id, 'parent_email', true );
+		$name  = get_user_meta( $user_id, 'parent_name',  true );
 		return [
 			'phone' => sanitize_text_field( $phone ?: '' ),
 			'email' => sanitize_email( $email ?: '' ),
+			'name'  => sanitize_text_field( $name ?: '' ),
 		];
+	}
+
+	private static function get_clean_course_name( int $product_id ): string {
+		$name = get_the_title( $product_id );
+		// Decode HTML entities (e.g. &#8211; → –) so WhatsApp shows clean text
+		return html_entity_decode( $name ?: __( 'course subscription', 'wc-irembopay' ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 	}
 
 	public static function send_expiry_notification( object $sub ): void {
@@ -296,12 +300,18 @@ class IremboPay_Subscription_Manager {
 
 		// Build WhatsApp link for parent
 		if ( ! empty( $parent_phone ) && ! empty( $pay_url ) ) {
+			$parent_name   = ! empty( $parent['name'] ) ? $parent['name'] : __( 'Parent/Guardian', 'wc-irembopay' );
+			$student_first = trim( explode( ' ', $customer_name )[0] );
+			$clean_course  = self::get_clean_course_name( $sub->product_id );
+			$amount_text   = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
+
 			$wa_message = sprintf(
-				"Hello! 👋\n\nYour child *%s*'s subscription to *%s* on *%s* has expired and their course access has been suspended.\n\nTo restore access, please make the payment of %s using the link below:\n\n%s\n\nThank you! 🙏",
-				$customer_name,
-				$product_name,
+				"Hello %s! 👋\n\n❌ Your child *%s*'s access to *%s* on *%s* has been suspended.\n\n💳 Amount to restore access: %s\n\n👉 Pay Now: %s\n\nAccess is restored automatically once payment is confirmed. Thank you! 🙏",
+				$parent_name,
+				$student_first,
+				$clean_course,
 				$site_name,
-				strip_tags( $amount ),
+				$amount_text,
 				$pay_url
 			);
 			$wa_link = self::build_whatsapp_link( $parent_phone, $wa_message );
@@ -398,14 +408,20 @@ class IremboPay_Subscription_Manager {
 		// WhatsApp link using parent phone from user profile
 		$parent_phone = ! empty( $parent['phone'] ) ? $parent['phone'] : ( $sub->parent_whatsapp ?? '' );
 		if ( ! empty( $parent_phone ) ) {
+			$parent_name    = ! empty( $parent['name'] ) ? $parent['name'] : __( 'Parent/Guardian', 'wc-irembopay' );
+			$student_first  = trim( explode( ' ', $customer_name )[0] );
+			$clean_course   = self::get_clean_course_name( $sub->product_id );
+			$amount_text    = number_format( (float) $sub->amount, 0, '.', ',' ) . ' ' . $sub->currency;
+
 			$wa_message = sprintf(
-				"Hello! 👋\n\nYour child *%s*'s subscription to *%s* on *%s* is due for renewal.\n\nAmount: %s\n\nPlease use the link below to pay and keep access active:\n\n%s\n\nAccess will be suspended in %d day(s) if unpaid. Thank you! 🙏",
-				$customer_name,
-				$product_name,
+				"Hello %s! 👋\n\nThis is a reminder that your child *%s*'s subscription to *%s* on *%s* is due for renewal.\n\n💳 Amount due: %s\n⏳ You have %d days to pay before access is suspended.\n\n👉 Pay Now: %s\n\nThank you! 🙏",
+				$parent_name,
+				$student_first,
+				$clean_course,
 				$site_name,
-				strip_tags( $amount ),
-				$pay_url,
-				$grace_days
+				$amount_text,
+				$grace_days,
+				$pay_url
 			);
 			$wa_link = self::build_whatsapp_link( $parent_phone, $wa_message );
 			$renewal_order->add_order_note(
