@@ -121,21 +121,32 @@ class IremboPay_Subscription_Product {
 	}
 
 	public function subscription_price_html( string $price, $product ): string {
-		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) { return $price; }
-		$interval = (int) get_post_meta( $product->get_id(), '_irembopay_billing_cycle_value', true ) ?: 1;
-		$unit     = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
+		if ( 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
+			return $price;
+		}
+
+		$interval       = (int) get_post_meta( $product->get_id(), '_irembopay_billing_cycle_value', true ) ?: 1;
+		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
 		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
-		if ( $total_payments > 0 ) {
+
+		// Format the unit label — singular or plural
+		$unit_label = $interval === 1 ? rtrim( $unit, 's' ) : $unit . 's';
+
+		if ( $total_payments > 1 ) {
+			// e.g. "100 Rwf / 6 months"  (total_payments > 1 means installments)
 			return sprintf(
-				'%s / %d %s &times; %d %s',
+				'%s / %d %s',
 				$price,
-				$interval,
-				esc_html( $unit ),
 				$total_payments,
-				esc_html( _n( 'payment', 'payments', $total_payments, 'wc-irembopay' ) )
+				esc_html( $total_payments === 1 ? $unit_label : $unit . 's' )
 			);
 		}
-		return sprintf( '%s / %d %s', $price, $interval, esc_html( $unit ) );
+
+		// Standard recurring — e.g. "100 Rwf / month" or "100 Rwf / 6 months"
+		if ( $interval === 1 ) {
+			return sprintf( '%s / %s', $price, esc_html( $unit_label ) );
+		}
+		return sprintf( '%s / %d %ss', $price, $interval, esc_html( $unit ) );
 	}
 
 	public function sold_individually( bool $sold, WC_Product $product ): bool {

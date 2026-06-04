@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.2
+- Fix: Course listing and single page price now shows "100 Rwf / 6 months" for installment products — clean public display without internal payment count details
+- Removed: "× N payments" text from public price display (admin-only info, shown in subscriptions table)
+
 ### v2.8.1
 - Config: Cron switched back to production timing — renewals run daily at midnight, expiry checks run twice daily
 
