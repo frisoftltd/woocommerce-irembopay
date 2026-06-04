@@ -8,6 +8,7 @@ class IremboPay_Subscription_Product {
 		add_action( 'woocommerce_product_data_panels',  [ $this, 'render_panel' ] );
 		add_action( 'woocommerce_process_product_meta', [ $this, 'save_subscription_data' ] );
 		add_filter( 'woocommerce_get_price_html',       [ $this, 'subscription_price_html' ], 10, 2 );
+		add_filter( 'tutor_course_price',               [ $this, 'tutor_course_price_html' ], 10, 2 );
 		add_filter( 'woocommerce_is_sold_individually', [ $this, 'sold_individually' ], 10, 2 );
 		add_filter( 'woocommerce_is_purchasable',       [ $this, 'is_purchasable' ], 10, 2 );
 	}
@@ -129,24 +130,45 @@ class IremboPay_Subscription_Product {
 		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
 		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
 
-		// Format the unit label — singular or plural
-		$unit_label = $interval === 1 ? rtrim( $unit, 's' ) : $unit . 's';
+		$suffix = $this->build_price_suffix( $interval, $unit, $total_payments );
 
+		// Prevent double suffix if filter fires twice
+		if ( str_contains( $price, $suffix ) ) {
+			return $price;
+		}
+
+		return $price . ' ' . $suffix;
+	}
+
+	public function tutor_course_price_html( $price, $product ): string {
+		if ( ! $product || 'yes' !== get_post_meta( $product->get_id(), '_irembopay_is_subscription', true ) ) {
+			return $price;
+		}
+
+		$interval       = (int) get_post_meta( $product->get_id(), '_irembopay_billing_cycle_value', true ) ?: 1;
+		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
+		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
+		$sale_price     = wc_price( $product->get_sale_price() ?: $product->get_price() );
+		$suffix         = $this->build_price_suffix( $interval, $unit, $total_payments );
+
+		return $sale_price . ' <span style="font-weight:400;font-size:.9em;color:#555">' . $suffix . '</span>';
+	}
+
+	private function build_price_suffix( int $interval, string $unit, int $total_payments ): string {
 		if ( $total_payments > 1 ) {
-			// e.g. "100 Rwf / 6 months"  (total_payments > 1 means installments)
+			// Installment: show total number of months
+			$total_months = $interval * $total_payments;
 			return sprintf(
-				'%s / %d %s',
-				$price,
-				$total_payments,
-				esc_html( $total_payments === 1 ? $unit_label : $unit . 's' )
+				'/ %d %s',
+				$total_months,
+				$total_months === 1 ? $unit : $unit . 's'
 			);
 		}
-
-		// Standard recurring — e.g. "100 Rwf / month" or "100 Rwf / 6 months"
+		// Standard recurring
 		if ( $interval === 1 ) {
-			return sprintf( '%s / %s', $price, esc_html( $unit_label ) );
+			return '/ ' . $unit;
 		}
-		return sprintf( '%s / %d %ss', $price, $interval, esc_html( $unit ) );
+		return sprintf( '/ %d %ss', $interval, $unit );
 	}
 
 	public function sold_individually( bool $sold, WC_Product $product ): bool {

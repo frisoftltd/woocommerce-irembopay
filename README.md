@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.3
+- Fix: Price suffix "/6 months" no longer duplicated when WooCommerce filter fires twice
+- Fix: Single course page now shows correct price with billing period via tutor_course_price filter
+
 ### v2.8.2
 - Fix: Course listing and single page price now shows "100 Rwf / 6 months" for installment products — clean public display without internal payment count details
 - Removed: "× N payments" text from public price display (admin-only info, shown in subscriptions table)
