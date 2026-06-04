@@ -142,6 +142,10 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.6.7
+- Fix: WhatsApp message line breaks now render correctly on WhatsApp Web desktop
+- Root cause: rawurlencode() produces uppercase %0A which WhatsApp Web ignores; switching to urlencode() per line joined with lowercase %0a fixes it
+
 ### v2.6.6
 - Fix: WhatsApp links now use web.whatsapp.com instead of wa.me — line breaks render correctly in the desktop browser input box before sending
 

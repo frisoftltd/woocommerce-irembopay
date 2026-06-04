@@ -197,8 +197,11 @@ class IremboPay_Subscription_Manager {
 		if ( strlen( $digits ) === 10 && str_starts_with( $digits, '0' ) ) {
 			$digits = '250' . ltrim( $digits, '0' );
 		}
-		// Use web.whatsapp.com so line breaks render correctly in the desktop browser
-		return 'https://web.whatsapp.com/send?phone=' . $digits . '&text=' . rawurlencode( $message );
+		// Encode each line separately and join with %0a (lowercase).
+		// WhatsApp Web respects %0a but ignores %0A from rawurlencode().
+		$lines   = explode( "\n", $message );
+		$encoded = implode( '%0a', array_map( 'urlencode', $lines ) );
+		return 'https://web.whatsapp.com/send?phone=' . $digits . '&text=' . $encoded;
 	}
 
 	private static function get_parent_contact( int $user_id ): array {
