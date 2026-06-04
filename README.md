@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.7.3
+- Fix: Tutor LMS product link now detected via both _tutor_course_product_id (UI key) and _tutor_product (legacy key) — courses linked via the Tutor LMS UI now automatically revoke/restore access without any manual setup
+
 ### v2.7.2
 - Fix: Course access revocation now works correctly — replaced $wpdb->update() with $wpdb->query() + prepare() for reliable multi-condition WHERE clause
 - Fix: Email brand color updated to #132241 across renewal and expiry email templates (header, button, accent)

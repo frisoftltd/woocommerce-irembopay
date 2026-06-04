@@ -147,8 +147,21 @@ class IremboPay_Tutor_Integration {
 	// ------------------------------------------------------------------ //
 
 	public function get_course_id_from_product( int $product_id ): ?int {
-		$courses = get_posts( [ 'post_type' => 'courses', 'meta_key' => self::TUTOR_PRODUCT_META, 'meta_value' => $product_id, 'numberposts' => 1, 'fields' => 'ids' ] );
-		return ! empty( $courses ) ? (int) $courses[0] : null;
+		// _tutor_course_product_id = saved by Tutor LMS UI dropdown (correct key)
+		// _tutor_product = legacy fallback
+		foreach ( [ '_tutor_course_product_id', self::TUTOR_PRODUCT_META ] as $meta_key ) {
+			$courses = get_posts( [
+				'post_type'   => 'courses',
+				'meta_key'    => $meta_key,
+				'meta_value'  => $product_id,
+				'numberposts' => 1,
+				'fields'      => 'ids',
+			] );
+			if ( ! empty( $courses ) ) {
+				return (int) $courses[0];
+			}
+		}
+		return null;
 	}
 
 	public function is_bundle_product( int $product_id ): bool {
