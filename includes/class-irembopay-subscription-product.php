@@ -160,7 +160,7 @@ class IremboPay_Subscription_Product {
 			. '</div>';
 	}
 
-	public function tutor_single_course_price( $price, $course_id ): string {
+	public function tutor_single_course_price( $price, $course_id ): ?string {
 		$product_id = get_post_meta( $course_id, '_tutor_course_product_id', true )
 		           ?: get_post_meta( $course_id, '_tutor_product', true );
 

@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.8
+- Fix: Nullable return type on tutor_single_course_price(); price display shows billing interval only
+
 ### v2.8.7
 - Fix: Price display now shows only billing interval (e.g. "26,250 Rwf / month") — total_payments is backend-only and never shown to customers
 
