@@ -132,7 +132,7 @@ class IremboPay_Subscription_Product {
 		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
 		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
 
-		$suffix = $this->build_price_suffix( $interval, $unit, $total_payments );
+		$suffix = $this->build_price_suffix( $interval, $unit );
 
 		// Prevent double suffix if filter fires twice
 		if ( str_contains( $price, $suffix ) ) {
@@ -153,7 +153,7 @@ class IremboPay_Subscription_Product {
 		$interval       = (int) get_post_meta( $product->get_id(), '_irembopay_billing_cycle_value', true ) ?: 1;
 		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
 		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
-		$suffix         = $this->build_price_suffix( $interval, $unit, $total_payments );
+		$suffix         = $this->build_price_suffix( $interval, $unit );
 
 		return $html . '<div style="font-size:1rem;font-weight:600;color:#222;margin-top:6px;letter-spacing:0.01em;">'
 			. esc_html( $suffix )
@@ -179,7 +179,7 @@ class IremboPay_Subscription_Product {
 		$unit           = get_post_meta( $product_id, '_irembopay_billing_cycle_unit', true ) ?: 'month';
 		$total_payments = (int) get_post_meta( $product_id, '_irembopay_total_payments', true );
 		$sale_price     = $product->get_sale_price() ?: $product->get_price();
-		$suffix         = $this->build_price_suffix( $interval, $unit, $total_payments );
+		$suffix         = $this->build_price_suffix( $interval, $unit );
 
 		return '<span class="tutor-course-price">'
 			. wc_price( $sale_price )
@@ -196,22 +196,12 @@ class IremboPay_Subscription_Product {
 		$unit           = get_post_meta( $product->get_id(), '_irembopay_billing_cycle_unit', true ) ?: 'month';
 		$total_payments = (int) get_post_meta( $product->get_id(), '_irembopay_total_payments', true );
 		$sale_price     = wc_price( $product->get_sale_price() ?: $product->get_price() );
-		$suffix         = $this->build_price_suffix( $interval, $unit, $total_payments );
+		$suffix         = $this->build_price_suffix( $interval, $unit );
 
 		return $sale_price . ' <span style="font-weight:400;font-size:.9em;color:#555">' . $suffix . '</span>';
 	}
 
-	private function build_price_suffix( int $interval, string $unit, int $total_payments ): string {
-		if ( $total_payments > 1 ) {
-			// Installment: show total number of months
-			$total_months = $interval * $total_payments;
-			return sprintf(
-				'/ %d %s',
-				$total_months,
-				$total_months === 1 ? $unit : $unit . 's'
-			);
-		}
-		// Standard recurring
+	private function build_price_suffix( int $interval, string $unit ): string {
 		if ( $interval === 1 ) {
 			return '/ ' . $unit;
 		}

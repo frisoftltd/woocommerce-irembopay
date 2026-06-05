@@ -142,6 +142,9 @@ woocommerce-irembopay/
 
 ## 📝 Changelog
 
+### v2.8.7
+- Fix: Price display now shows only billing interval (e.g. "26,250 Rwf / month") — total_payments is backend-only and never shown to customers
+
 ### v2.8.6
 - Improved: Billing period suffix on single course page now matches price font size and color
 
