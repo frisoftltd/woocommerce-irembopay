@@ -3,6 +3,21 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class WC_Gateway_IremboPay extends WC_Payment_Gateway {
 
+	/** @var string */
+	public string $secret_key = '';
+
+	/** @var string */
+	public string $public_key = '';
+
+	/** @var string */
+	public string $payment_identifier = '';
+
+	/** @var string */
+	public string $product_code = '';
+
+	/** @var bool */
+	public bool $testmode = false;
+
 	public function __construct() {
 		$this->id                 = 'irembopay';
 		$this->has_fields         = false;
